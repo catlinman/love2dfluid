@@ -36,7 +36,8 @@ function fluidsystem.new()
 	local system = {}
 
 	-- This value defaults to 0.981 since the system is intended for sidescrolling games. A value of zero might be useful for top down based games.
-	system.gravity = 0.981
+	-- system.gravity = 0.981
+	system.gravity = 0.05
 
 	system.damping = 1 -- How much particles lose velocity when not colliding
 
@@ -50,8 +51,11 @@ function fluidsystem.new()
 	system.colliders = {} -- Table containing a set of objects that particles can collide with
 	system.affectors = {} -- Table containing objects that affect the flow of particles
 
+	system.collisionsNum = 1
+	system.collisions = {}
+
 	-- Add and remove particles using the following two methods
-	function system:addParticle(x, y, vx, vy, color, r)
+	function system:addParticle(x, y, vx, vy, color, r, mass)
 		local particle = {} -- Create a new particle contained in a table
 
 		-- Assign values that we will use to track certain states of the particle
@@ -64,7 +68,7 @@ function fluidsystem.new()
 
 		-- Color, radius and collider
 		particle.color = color or {255, 255, 255, 255} -- Colors: {RED, GREEN, BLUE, ALPHA/OPACITY}
-		particle.r = r or 1
+		particle.r = r or 8
 		particle.collider = fluidsystem.createCircleCollider(particle.r)
 
 		-- Id assignment
@@ -106,26 +110,40 @@ function fluidsystem.new()
 			particle.x = particle.x + particle.vx
 			particle.y = particle.y + particle.vy
 
-			-- Check if the particle is out of bounds and resolve the collision
-			if particle.y + particle.r > 768 then
-				particle.y = 768 - particle.r
-				particle.vy = -particle.vy / 2
-			end
-
 			-- Perform collision detection and resolution here
 			for j, particle2 in pairs(self.particles) do
 				-- Make sure we are not checking against an already checked particle
 				if particle2 ~= particle then
-					if fluidsystem.boxCollision(particle, particle2) then
-						particle2.vx = particle2.vx + (particle.vx / 2)
-						particle.vx = -particle.vx / 2
-
-						particle2.vy = particle2.vy + (particle.vy / 2)
-						particle.vy = -particle.vy / 2
+					if fluidsystem.circleCollision(particle, particle2) then
+						self.collisions[self.collisionsNum] = {particle, particle2}
 					end
 				end
 			end
+
+			-- Check if the particle is out of bounds and resolve the collision
+			if particle.y + particle.r > 768 then
+				particle.y = 768 - particle.r
+				particle.vy = -(particle.vy / 2)
+			elseif particle.y - particle.r < 0 then
+				particle.y = 0 + particle.r
+				particle.vy = -(particle.vy / 2)
+			end
+
+			if particle.x - particle.r < 0 then
+				particle.x = 0 + particle.r
+				particle.vx = -(particle.vx / 2)
+			elseif particle.x + particle.r > 1024 then
+				particle.x = 1024 - particle.r
+				particle.vx = -(particle.vx / 2)
+			end
 		end
+
+		for i, collision in pairs(self.collisions) do
+			fluidsystem.circleResolution(collision[1], collision[2])
+		end
+
+		self.collisionsNum = 1
+		self.collisions = {}
 	end
 
 	-- Method to draw the current state of the fluid simulation
@@ -165,7 +183,9 @@ end
 function fluidsystem.createBoxCollider(w, h)
 	local collider = {}
 
-	collider.w, collider.h = w or 16, h or 16
+	collider.collisionType = "box"
+	collider.w = w or 16
+	collider.h = h or 16
 
 	return collider
 end
@@ -173,19 +193,22 @@ end
 function fluidsystem.createCircleCollider(r)
 	local collider = {}
 
+	collider.collisionType = "circle"
 	collider.r = r or 8
 
 	return collider
 end
 
 -- Image collider takes in an image to calculate pixel perfect collision
-function fluidsystem.createImageCollider(sx, sy, imagedata)
+function fluidsystem.createPixelCollider(sx, sy, imagedata)
 	local collider = {}
+
+	collider.collisionType = "pixel"
 
 	return collider
 end
 
--- Basic box collision detection
+-- Basic box collision detection (c1/c2 arguments are the two colliders that should be checked for collision)
 function fluidsystem.boxCollision(c1, c2)
 	-- Convert this and the selected colliders types to those usable by box collision
 	local c1w = c1.collider.w or c1.collider.r or 16
@@ -197,7 +220,11 @@ function fluidsystem.boxCollision(c1, c2)
 	local c1x2, c1y2, c2x2, c2y2 = c1.x + c1w, c1.y + c1h, c2.x + c2w, c2.y + c2h
 
 	-- Returns true if a box collision was detected
-	return c1.x < c2x2 and c1x2 > c2.x and c1.y < c2y2 and c1y2 > c2.y
+	if c1.x < c2x2 and c1x2 > c2.x and c1.y < c2y2 and c1y2 > c2.y then
+		return {c1.x, c1x2, c1.y, c1y2, c2.y, c2x2, c2.y, c2y2}
+	else
+		return false
+	end
 end
 
 -- Circle collision without the use of math.sqrt
@@ -208,9 +235,39 @@ function fluidsystem.circleCollision(c1, c2)
 	local dist = (c2.x - c1.x)^2 + (c2.y - c1.y)^2
 
 	-- Returns true if a circle collision was detected
-	return (dist + c2r^2 - c1r^2) < c1r^2
+	return (dist + (c2r^2 - c1r^2)) < (c1r*2)^2
 end
 
 function fluidsystem.pixelCollision(c1, c2)
-	-- Still needs code
+
+end
+
+-- Collision resolution functions
+function fluidsystem.boxResolution(c1, c2)
+
+end
+
+function fluidsystem.circleResolution(c1, c2)
+	local c1r = c1.collider.w or c1.collider.r or 8
+	local c2r = c2.collider.w or c2.collider.r or 8
+
+	local collisionPointX = ((c1.x * c2r) + (c2.x * c1r)) / (c1r + c2r)
+	local collisionPointY = ((c1.y * c2r) + (c2.y * c1r)) / (c1r + c2r)
+
+	c1.vx = (collisionPointX - c1.x) - (c1.vx / 2)
+	c1.vy = (collisionPointY - c1.y) - (c1.vy / 2)
+	c2.vx = (collisionPointX - c2.x) - (c2.vx / 2)
+	c2.vy = (collisionPointY - c2.y) - (c2.vy / 2)
+
+	c1.x = c1.x + c1.vx * 2
+	c1.y = c1.y + c1.vy * 2
+	c2.x = c2.x + c2.vx * 2
+	c2.y = c2.y + c2.vy * 2
+
+	print(c1.vx)
+	print(c2.vx)
+end
+
+function fluidsystem.pixelResolution(c1, c2)
+
 end
