@@ -116,7 +116,13 @@ function fluidsystem.new()
 			for j, particle2 in pairs(self.particles) do
 				-- Make sure we are not checking against an already checked particle
 				if particle2 ~= particle then
-					if particle.collider:circleCollision(particle2.collider) then print("Detected collision") end
+					if fluidsystem.boxCollision(particle, particle2) then
+						particle2.vx = particle2.vx + (particle.vx / 2)
+						particle.vx = -particle.vx / 2
+
+						particle2.vy = particle2.vy + (particle.vy / 2)
+						particle.vy = -particle.vy / 2
+					end
 				end
 			end
 		end
@@ -126,7 +132,7 @@ function fluidsystem.new()
 	function system:draw()
 		for i, particle in pairs(self.particles) do
 			love.graphics.setColor(particle.color)
-			love.graphics.circle("fill", particle.x, particle.y, particle.r, 16)
+			love.graphics.circle("fill", particle.x, particle.y, particle.r)
 		end
 
 		love.graphics.setColor(255, 255, 255, 255) -- We reset the global color so we don't affect any other game drawing events
@@ -155,63 +161,17 @@ function fluidsystem.destroy()
 	end
 end
 
--- Fluid system collider classes. The fluid system takes in any of these and uses them to interact with the particle system.
-
--- Base collider class - only contains functions used to handle conversion between collider types.
-function fluidsystem.createBaseCollider(x, y)
+-- Fluid system collision handling
+function fluidsystem.createBoxCollider(w, h)
 	local collider = {}
 
-	collider.x = x or 0
-	collider.y = y or 0
-
-	-- The 'c' argument is the collider that this one is to check for collision against
-
-	-- Basic box collision detection
-	function collider:boxCollision(c)
-		-- Convert this and the selected colliders types to those usable by box collision
-		local w = self.w or self.r or 16
-		local h = self.h or self.r or 16
-
-		local w2 = c.w or c.r or 16
-		local h2 = c.h or c.r or 16
-
-		local x2, y2, cx2, cy2 = self.x + w, self.y + h, c.x + w2, c.y + h2
-
-		-- Returns true if a box collision was detected
-		return self.x < cx2 and x2 > c.x and self.y < cy2 and y2 > c.y
-	end
-
-	-- Circle collision without the use of math.sqrt
-	function collider:circleCollision(c)
-		local r = self.w or self.r or 8
-		local r2 = c.w or c.r or 8
-
-		local dist = (c.x - self.x)^2 + (c.y - self.y)^2
-
-		-- Returns true if a circle collision was detected
-		return (dist + r2^2) < r^2
-	end
-
-	function collider:pixelCollision(c)
-		-- Still needs code
-	end
+	collider.w, collider.h = w or 16, h or 16
 
 	return collider
 end
 
--- The most basic collider type. Simple box intersection collider.
-function fluidsystem.createBoxCollider(x, y, w, h)
-	local collider = fluidsystem.createBaseCollider(x, y)
-
-	collider.w = w or 16
-	collider.h = h or 16
-
-	return collider
-end
-
--- Circle collider uses radius based calculation to detect and resolve collision
-function fluidsystem.createCircleCollider(x, y, r)
-	local collider = fluidsystem.createBaseCollider(x, y)
+function fluidsystem.createCircleCollider(r)
+	local collider = {}
 
 	collider.r = r or 8
 
@@ -219,8 +179,38 @@ function fluidsystem.createCircleCollider(x, y, r)
 end
 
 -- Image collider takes in an image to calculate pixel perfect collision
-function fluidsystem.createImageCollider(x, y, sx, sy, imagedata)
-	local collider = fluidsystem.createBaseCollider(x, y)
+function fluidsystem.createImageCollider(sx, sy, imagedata)
+	local collider = {}
 
 	return collider
+end
+
+-- Basic box collision detection
+function fluidsystem.boxCollision(c1, c2)
+	-- Convert this and the selected colliders types to those usable by box collision
+	local c1w = c1.collider.w or c1.collider.r or 16
+	local c1h = c1.collider.h or c1.collider.r or 16
+
+	local c2w = c2.collider.w or c2.collider.r or 16
+	local c2h = c2.collider.h or c2.collider.r or 16
+
+	local c1x2, c1y2, c2x2, c2y2 = c1.x + c1w, c1.y + c1h, c2.x + c2w, c2.y + c2h
+
+	-- Returns true if a box collision was detected
+	return c1.x < c2x2 and c1x2 > c2.x and c1.y < c2y2 and c1y2 > c2.y
+end
+
+-- Circle collision without the use of math.sqrt
+function fluidsystem.circleCollision(c1, c2)
+	local c1r = c1.collider.w or c1.collider.r or 8
+	local c2r = c2.collider.w or c2.collider.r or 8
+
+	local dist = (c2.x - c1.x)^2 + (c2.y - c1.y)^2
+
+	-- Returns true if a circle collision was detected
+	return (dist + c2r^2 - c1r^2) < c1r^2
+end
+
+function fluidsystem.pixelCollision(c1, c2)
+	-- Still needs code
 end
