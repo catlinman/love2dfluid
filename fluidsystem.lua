@@ -38,7 +38,7 @@ function fluidsystem.new()
 	-- This value defaults to 0.981 since the system is intended for sidescrolling games. A value of zero might be useful for top down based games.
 	-- system.gravity = 0.981
 	system.gravity = 0.05
-
+	system.mass = 1
 	system.damping = 1 -- How much particles lose velocity when not colliding
 
 	-- Assign the current system id and increment it
@@ -66,9 +66,10 @@ function fluidsystem.new()
 		particle.vx = vx or 0
 		particle.vy = vy or 0
 
-		-- Color, radius and collider
+		-- Color, radius, mass and collider
 		particle.color = color or {255, 255, 255, 255} -- Colors: {RED, GREEN, BLUE, ALPHA/OPACITY}
 		particle.r = r or 8
+		particle.mass = mass or self.mass
 		particle.collider = fluidsystem.createCircleCollider(particle.r)
 
 		-- Id assignment
@@ -255,20 +256,22 @@ function fluidsystem.circleResolution(c1, c2)
 	local collisionPointX = ((c1.x * c2r) + (c2.x * c1r)) / (c1r + c2r)
 	local collisionPointY = ((c1.y * c2r) + (c2.y * c1r)) / (c1r + c2r)
 
-	local c1vx = c1.vx - (collisionPointX - c1.x) - c2.vx
-	local c1vy = c1.vy - (collisionPointY - c1.y) - c2.vy
-	local c2vx = c2.vx - (collisionPointX - c2.x) - c1.vx
-	local c2vy = c2.vy - (collisionPointY - c2.y) - c1.vy
+	local jointMass = c1.mass + c2.mass
+	local differenceMass = c1.mass - c2.mass
+	local c1vx = (c1.vx * differenceMass) + (2 * c2.mass * c2.vx) / jointMass
+	local c1vy = (c1.vy * differenceMass) + (2 * c2.mass * c2.vy) / jointMass
+	local c2vx = (c2.vx * differenceMass) + (2 * c1.mass * c1.vx) / jointMass
+	local c2vy = (c2.vy * differenceMass) + (2 * c1.mass * c1.vy) / jointMass
 
-	c1.x = c1.x + c1vx / 8
-	c1.y = c1.y + c1vy / 8
-	c2.x = c2.x + c2vx / 8
-	c2.y = c2.y + c2vy / 8
+	c1.x = c1.x + (c1vx * 2)
+	c1.y = c1.y + (c1vy * 2)
+	c2.x = c2.x + (c2vx * 2)
+	c2.y = c2.y + (c2vy * 2)
 
-	c1.vx = c1vx / 8
-	c1.vy = c1vy / 8
-	c2.vx = c2vx / 8
-	c2.vy = c2vy / 8
+	c1.vx = c1vx
+	c1.vy = c1vy
+	c2.vx = c2vx
+	c2.vy = c2vy
 end
 
 function fluidsystem.pixelResolution(c1, c2)
