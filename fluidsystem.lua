@@ -124,6 +124,7 @@ function fluidsystem.new()
 			if particle.y + particle.r > 768 then
 				particle.y = 768 - particle.r
 				particle.vy = -(particle.vy / 2)
+				particle.vx = particle.vx / 1.005
 			elseif particle.y - particle.r < 0 then
 				particle.y = 0 + particle.r
 				particle.vy = -(particle.vy / 2)
@@ -254,18 +255,20 @@ function fluidsystem.circleResolution(c1, c2)
 	local collisionPointX = ((c1.x * c2r) + (c2.x * c1r)) / (c1r + c2r)
 	local collisionPointY = ((c1.y * c2r) + (c2.y * c1r)) / (c1r + c2r)
 
-	c1.vx = (collisionPointX - c1.x) - (c1.vx / 2)
-	c1.vy = (collisionPointY - c1.y) - (c1.vy / 2)
-	c2.vx = (collisionPointX - c2.x) - (c2.vx / 2)
-	c2.vy = (collisionPointY - c2.y) - (c2.vy / 2)
+	local c1vx = c1.vx - (collisionPointX - c1.x) - c2.vx
+	local c1vy = c1.vy - (collisionPointY - c1.y) - c2.vy
+	local c2vx = c2.vx - (collisionPointX - c2.x) - c1.vx
+	local c2vy = c2.vy - (collisionPointY - c2.y) - c1.vy
 
-	c1.x = c1.x + c1.vx * 2
-	c1.y = c1.y + c1.vy * 2
-	c2.x = c2.x + c2.vx * 2
-	c2.y = c2.y + c2.vy * 2
+	c1.x = c1.x + c1vx / 8
+	c1.y = c1.y + c1vy / 8
+	c2.x = c2.x + c2vx / 8
+	c2.y = c2.y + c2vy / 8
 
-	print(c1.vx)
-	print(c2.vx)
+	c1.vx = c1vx / 8
+	c1.vy = c1vy / 8
+	c2.vx = c2vx / 8
+	c2.vy = c2vy / 8
 end
 
 function fluidsystem.pixelResolution(c1, c2)

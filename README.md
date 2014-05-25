@@ -6,7 +6,7 @@ The fluid system in this repository was originally created for as a self decided
 
 ## Implemention ##
 
-To add the fluid framework to your Love2d project all you have to do is to insert the fluidsystem.lua file into your projects root folder. From there you will have to add `require(fluidsystem)` to the start of your main.lua file. Creating new fluid systems is quite simple. The module allows developers to easily create new systems by calling `fluidsystem.new()`. More information on the parameters of the function will be added soon. As of now, calling the function also returns a reference to the newly created fluid system which you can use to modify it to your liking. 
+To add the fluid framework to your Love2d project all you have to do is to insert the fluidsystem.lua file into your projects root folder. From there you will have to add `require("fluidsystem")` to the start of your main.lua file. Creating new fluid systems is quite simple. The module allows developers to easily create new systems by calling `fluidsystem.new()`. More information on the parameters of the function will be added soon. As of now, calling the function also returns a reference to the newly created fluid system which you can use to modify it to your liking. 
 
 ## Collaborators ##
 
