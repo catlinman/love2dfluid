@@ -54,9 +54,6 @@ function fluidsystem.new()
 	system.colliders = {} -- Table containing a set of objects that particles can collide with
 	system.affectors = {} -- Table containing objects that affect the flow of particles
 
-	system.collisionsNum = 1
-	system.collisions = {}
-
 	-- Add and remove particles using the following two methods
 	function system:addParticle(x, y, vx, vy, color, r, mass)
 		local particle = {} -- Create a new particle contained in a table
@@ -68,6 +65,9 @@ function fluidsystem.new()
 		-- Velocity values
 		particle.vx = vx or 0
 		particle.vy = vy or 0
+
+		-- Table containing particles already collided with this one.
+		particle.collided = {}
 
 		-- Color, radius, mass and collider
 		particle.color = color or {255, 255, 255, 255} -- Colors: {RED, GREEN, BLUE, ALPHA/OPACITY}
@@ -117,40 +117,26 @@ function fluidsystem.new()
 			-- Perform collision detection and resolution here
 			for j, particle2 in pairs(self.particles) do
 				-- Make sure we are not checking against an already checked particle
-				if particle2 ~= particle then
+				if particle2 ~= particle and not particle[particle2.id] then
 					if fluidsystem.circleCollision(particle, particle2) then
 						fluidsystem.circleResolution(particle, particle2)
+
+						-- Add the particles to the table of already resolutioned particles
+						particle.collided[particle2.id] = particle2
+						particle2.collided[particle.id] = particle
 					end
 				end
+							-- Check if the particle is out of bounds and resolve the collision
+			fluidsystem.screenResolution(particle2)
 			end
 
-			-- Check if the particle is out of bounds and resolve the collision
-			if particle.y + particle.r > screenHeight then
-				particle.y = screenHeight - particle.r
-				particle.vy = -(particle.vy / 2)
-				particle.vx = particle.vx / 1.005
-			elseif particle.y - particle.r < 0 then
-				particle.y = 0 + particle.r
-				particle.vy = -(particle.vy / 2)
-			end
 
-			if particle.x - particle.r < 0 then
-				particle.x = 0 + particle.r
-				particle.vx = -(particle.vx / 2)
-			elseif particle.x + particle.r > screenWidth then
-				particle.x = screenWidth - particle.r
-				particle.vx = -(particle.vx / 2)
-			end
 		end
 
-		--[[
-			for i, collision in pairs(self.collisions) do
-			
-			end
-		--]]
-
-		self.collisionsNum = 1
-		self.collisions = {}
+		-- Clean up particle collision tables
+		for i, particle in pairs(self.particles) do
+			particle.collided = {}
+		end
 	end
 
 	-- Method to draw the current state of the fluid simulation
@@ -281,4 +267,26 @@ end
 
 function fluidsystem.pixelResolution(c1, c2)
 
+end
+
+function fluidsystem.screenResolution(c)
+	local cw = c.collider.w or c.collider.r or 16
+	local ch = c.collider.h or c.collider.r or 16
+
+	if c.y + ch > screenHeight then
+		c.y = screenHeight - cw
+		c.vy = -(c.vy / 2)
+		c.vx = c.vx / 1.005
+	elseif c.y - ch < 0 then
+		c.y = 0 + ch
+		c.vy = -(c.vy / 2)
+	end
+
+	if c.x - cw < 0 then
+		c.x = 0 + cw
+		c.vx = -(c.vx / 2)
+	elseif c.x + cw > screenWidth then
+		c.x = screenWidth - cw
+		c.vx = -(c.vx / 2)
+	end
 end

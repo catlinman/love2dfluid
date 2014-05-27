@@ -9,9 +9,14 @@ local fluid = {}
 
 function love.load()
 	fluid = fluidsystem.new()
-	for i=1, 16 do
-		fluid:addParticle(math.random(32, 1024 - 32), math.random(32, 256), math.random(-4,4), math.random(-4,4), nil, 16)
+	for i=1, 30 do
+		fluid:addParticle(i * 32, 32, 0, 0, nil, 16)
 	end
+	for i=1, 30 do
+		fluid:addParticle(i * 32, 128, 0, 0, nil, 16)
+	end
+
+	fluid:addParticle(95, 75, 0, 0, nil, 16)
 end
 
 function love.update(dt)
