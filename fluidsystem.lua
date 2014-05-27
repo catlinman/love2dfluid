@@ -26,6 +26,9 @@
 	Use the fluid.get() function to return a reference to one of the currently loaded fluid systems.
 -]]
 
+-- Currently used to keep particles in the screen area
+local screenWidth, screenHeight = love.graphics.getWidth(), love.graphics.getHeight()
+
 local systems = {} -- Table containing the fluid systems
 local id = 1 -- Fluid system reference identification
 
@@ -116,14 +119,14 @@ function fluidsystem.new()
 				-- Make sure we are not checking against an already checked particle
 				if particle2 ~= particle then
 					if fluidsystem.circleCollision(particle, particle2) then
-						self.collisions[self.collisionsNum] = {particle, particle2}
+						fluidsystem.circleResolution(particle, particle2)
 					end
 				end
 			end
 
 			-- Check if the particle is out of bounds and resolve the collision
-			if particle.y + particle.r > 768 then
-				particle.y = 768 - particle.r
+			if particle.y + particle.r > screenHeight then
+				particle.y = screenHeight - particle.r
 				particle.vy = -(particle.vy / 2)
 				particle.vx = particle.vx / 1.005
 			elseif particle.y - particle.r < 0 then
@@ -134,15 +137,17 @@ function fluidsystem.new()
 			if particle.x - particle.r < 0 then
 				particle.x = 0 + particle.r
 				particle.vx = -(particle.vx / 2)
-			elseif particle.x + particle.r > 1024 then
-				particle.x = 1024 - particle.r
+			elseif particle.x + particle.r > screenWidth then
+				particle.x = screenWidth - particle.r
 				particle.vx = -(particle.vx / 2)
 			end
 		end
 
-		for i, collision in pairs(self.collisions) do
-			fluidsystem.circleResolution(collision[1], collision[2])
-		end
+		--[[
+			for i, collision in pairs(self.collisions) do
+			
+			end
+		--]]
 
 		self.collisionsNum = 1
 		self.collisions = {}
@@ -263,10 +268,10 @@ function fluidsystem.circleResolution(c1, c2)
 	local c2vx = (c2.vx * differenceMass) + (2 * c1.mass * c1.vx) / jointMass
 	local c2vy = (c2.vy * differenceMass) + (2 * c1.mass * c1.vy) / jointMass
 
-	c1.x = c1.x + (c1vx * 2)
-	c1.y = c1.y + (c1vy * 2)
-	c2.x = c2.x + (c2vx * 2)
-	c2.y = c2.y + (c2vy * 2)
+	c1.x = c1.x + c1vx
+	c1.y = c1.y + c1vy
+	c2.x = c2.x + c2vx
+	c2.y = c2.y + c2vy
 
 	c1.vx = c1vx
 	c1.vy = c1vy

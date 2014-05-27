@@ -1,4 +1,3 @@
-
 function love.conf(t)
     t.identity = "lovefluid"
     t.version = "0.9.0"
