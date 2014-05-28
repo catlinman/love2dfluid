@@ -39,8 +39,7 @@ function fluidsystem.new()
 	local system = {}
 
 	-- This value defaults to 0.981 since the system is intended for sidescrolling games. A value of zero might be useful for top down based games.
-	-- system.gravity = 0.981
-	system.gravity = 0.05
+	system.gravity = 0.981
 	system.mass = 1
 	system.damping = 1 -- How much particles lose velocity when not colliding
 
@@ -110,6 +109,10 @@ function fluidsystem.new()
 			-- Add the system's gravity to the particles velocity
 			particle.vy = particle.vy + self.gravity
 
+			-- We save the last position this particle was in before it collided to avoid intersection issues
+			local safex = particle.x
+			local safey = particle.y
+
 			-- We apply each particles velocity to it's current position
 			particle.x = particle.x + particle.vx
 			particle.y = particle.y + particle.vy
@@ -119,6 +122,10 @@ function fluidsystem.new()
 				-- Make sure we are not checking against an already checked particle
 				if particle2 ~= particle and not particle[particle2.id] then
 					if fluidsystem.circleCollision(particle, particle2) then
+						-- The particle has collided so we can assume that it's last position was outside of the collision. We reset the position.
+						particle.x = safex
+						particle.y = safey
+
 						fluidsystem.circleResolution(particle, particle2)
 
 						-- Add the particles to the table of already resolutioned particles
@@ -249,20 +256,18 @@ function fluidsystem.circleResolution(c1, c2)
 
 	local jointMass = c1.mass + c2.mass
 	local differenceMass = c1.mass - c2.mass
+
 	local c1vx = (c1.vx * differenceMass) + (2 * c2.mass * c2.vx) / jointMass
 	local c1vy = (c1.vy * differenceMass) + (2 * c2.mass * c2.vy) / jointMass
 	local c2vx = (c2.vx * differenceMass) + (2 * c1.mass * c1.vx) / jointMass
 	local c2vy = (c2.vy * differenceMass) + (2 * c1.mass * c1.vy) / jointMass
 
-	c1.x = c1.x + c1vx
-	c1.y = c1.y + c1vy
-	c2.x = c2.x + c2vx
-	c2.y = c2.y + c2vy
-
 	c1.vx = c1vx
 	c1.vy = c1vy
 	c2.vx = c2vx
 	c2.vy = c2vy
+
+	return collisionPointX, collisionPointY
 end
 
 function fluidsystem.pixelResolution(c1, c2)
