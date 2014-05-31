@@ -10,9 +10,9 @@ local fluid = {}
 function love.load()
 	fluid = fluidsystem.new()
 
-	for i=1, 64 do
+	for i=1, 4 do
 		for j=1, 4 do
-			fluid:addParticle(i * 16, j * 16, math.random(-1,1), 0, nil, 8)
+			fluid:addParticle(64 + i * 64, j * 64, math.random(-1,1), 0, nil, 16)
 		end
 	end
 end
@@ -23,7 +23,7 @@ function love.update(dt)
 	while strayTime >= timestep do
 		strayTime = strayTime - timestep
 
-		fluid:simulate(timestep)
+		fluidsystem.update(timestep)
 	end
 end
 

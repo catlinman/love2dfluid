@@ -39,7 +39,7 @@ function fluidsystem.new()
 	local system = {}
 
 	-- This value defaults to 0.981 since the system is intended for sidescrolling games. A value of zero might be useful for top down based games.
-	system.gravity = 0.981
+	system.gravity = 0.0981
 	system.mass = 1
 	system.damping = 1 -- How much particles lose velocity when not colliding
 
@@ -122,22 +122,20 @@ function fluidsystem.new()
 				-- Make sure we are not checking against an already checked particle
 				if particle2 ~= particle and not particle[particle2.id] then
 					if fluidsystem.circleCollision(particle, particle2) then
-						-- The particle has collided so we can assume that it's last position was outside of the collision. We reset the position.
-						particle.x = safex
-						particle.y = safey
-
 						fluidsystem.circleResolution(particle, particle2)
 
+						-- The particle has collided so we can assume that it's last position was outside of the collision. We reset the position.
+						particle.x = safex + particle.vx
+						particle.y = safey + particle.vy
+
 						-- Add the particles to the table of already resolutioned particles
-						particle.collided[particle2.id] = particle2
-						particle2.collided[particle.id] = particle
+
 					end
 				end
-							-- Check if the particle is out of bounds and resolve the collision
-			fluidsystem.screenResolution(particle2)
+			
+				-- Check if the particle is out of bounds and resolve the collision
+				fluidsystem.screenResolution(particle2)
 			end
-
-
 		end
 
 		-- Clean up particle collision tables
@@ -148,12 +146,16 @@ function fluidsystem.new()
 
 	-- Method to draw the current state of the fluid simulation
 	function system:draw()
+		-- love.graphics.setPixelEffect(metaeffect)
+
 		for i, particle in pairs(self.particles) do
 			love.graphics.setColor(particle.color)
 			love.graphics.circle("fill", particle.x, particle.y, particle.r)
 		end
 
 		love.graphics.setColor(255, 255, 255, 255) -- We reset the global color so we don't affect any other game drawing events
+
+		-- love.graphics.setPixelEffect()
 	end
 
 	-- Add this new fluid system to the table of all currently instantiated systems
@@ -161,6 +163,20 @@ function fluidsystem.new()
 
 	-- Return the system so the user has the option of saving a reference to it if necessary
 	return system
+end
+
+-- Fuction to update all fluidsystems
+function fluidsystem.update(dt)
+	for i, system in pairs(systems) do
+		system:simulate(dt)
+	end
+end
+
+-- Function to draw all fluidsystems
+function fluidsystem.draw()
+	for i, system in pairs(systems) do
+		system:draw()
+	end
 end
 
 -- Get a fluid system by it's id or name from the systems table
@@ -183,7 +199,6 @@ end
 function fluidsystem.createBoxCollider(w, h)
 	local collider = {}
 
-	collider.collisionType = "box"
 	collider.w = w or 16
 	collider.h = h or 16
 
@@ -193,7 +208,6 @@ end
 function fluidsystem.createCircleCollider(r)
 	local collider = {}
 
-	collider.collisionType = "circle"
 	collider.r = r or 8
 
 	return collider
@@ -202,8 +216,6 @@ end
 -- Image collider takes in an image to calculate pixel perfect collision
 function fluidsystem.createPixelCollider(sx, sy, imagedata)
 	local collider = {}
-
-	collider.collisionType = "pixel"
 
 	return collider
 end
@@ -223,7 +235,8 @@ function fluidsystem.boxCollision(c1, c2)
 	if c1.x < c2x2 and c1x2 > c2.x and c1.y < c2y2 and c1y2 > c2.y then
 		return {c1.x, c1x2, c1.y, c1y2, c2.y, c2x2, c2.y, c2y2}
 	else
-		return false
+		-- Return the new collision box
+		return {}
 	end
 end
 
@@ -257,10 +270,10 @@ function fluidsystem.circleResolution(c1, c2)
 	local jointMass = c1.mass + c2.mass
 	local differenceMass = c1.mass - c2.mass
 
-	local c1vx = (c1.vx * differenceMass) + (2 * c2.mass * c2.vx) / jointMass
-	local c1vy = (c1.vy * differenceMass) + (2 * c2.mass * c2.vy) / jointMass
-	local c2vx = (c2.vx * differenceMass) + (2 * c1.mass * c1.vx) / jointMass
-	local c2vy = (c2.vy * differenceMass) + (2 * c1.mass * c1.vy) / jointMass
+	local c1vx = (((c1.vx * differenceMass) + (2 *c2.mass * c2.vx)) / jointMass)
+	local c1vy = (((c1.vy * differenceMass) + (2 *c2.mass * c2.vy)) / jointMass)
+	local c2vx = (((c2.vx * differenceMass) + (2 *c1.mass * c1.vx)) / jointMass)
+	local c2vy = (((c2.vy * differenceMass) + (2 *c1.mass * c1.vy)) / jointMass)
 
 	c1.vx = c1vx
 	c1.vy = c1vy
