@@ -121,7 +121,8 @@ function fluidsystem.new()
 			for j, particle2 in pairs(self.particles) do
 				-- Make sure we are not checking against an already checked particle
 				if particle2 ~= particle and not particle[particle2.id] then
-					if fluidsystem.circleCollision(particle, particle2) then
+					if fluidsystem.boxCollision(particle, particle2) then
+						print("COL")
 						fluidsystem.circleResolution(particle, particle2)
 
 						-- The particle has collided so we can assume that it's last position was outside of the collision. We reset the position.
@@ -129,7 +130,6 @@ function fluidsystem.new()
 						particle.y = safey + particle.vy
 
 						-- Add the particles to the table of already resolutioned particles
-
 					end
 				end
 			
@@ -150,7 +150,8 @@ function fluidsystem.new()
 
 		for i, particle in pairs(self.particles) do
 			love.graphics.setColor(particle.color)
-			love.graphics.circle("fill", particle.x, particle.y, particle.r)
+			love.graphics.circle("line", particle.x, particle.y, particle.r)
+			love.graphics.rectangle("line", particle.x - particle.r + particle.collider.ox, particle.y - particle.r + particle.collider.oy, particle.r * 2, particle.r * 2)
 		end
 
 		love.graphics.setColor(255, 255, 255, 255) -- We reset the global color so we don't affect any other game drawing events
@@ -195,49 +196,74 @@ function fluidsystem.destroy()
 	end
 end
 
+--[[
+	Collider data structure:
+	x and y are handled from the object the collider is a parent of.
+	The parent of the collider is passed to the collsion functions. NOT THE COLLIDER.
+	
+	->	Collision detection will fail if there is no x and y variable attached to the parent.
+
+	Every collider has either a 'w,h' and or a 'r' variable.
+	If it doesn't have one of these each function will generate one of the fly.
+
+	Colliders also have 'ox' and 'oy' members. These represent the collider's offset in terms of
+	the x- and y-coordinates in relation to the parents position.
+
+	-> Collision detection will fail if there are no ox and oy members in the collider table.
+--]]
+
 -- Fluid system collision handling
-function fluidsystem.createBoxCollider(w, h)
+function fluidsystem.createBoxCollider(w, h, ox, oy)
 	local collider = {}
 
+	collider.collisionType = "box"
 	collider.w = w or 16
 	collider.h = h or 16
+	collider.ox, collider.oy = ox or 0, oy or 0
 
 	return collider
 end
 
-function fluidsystem.createCircleCollider(r)
+function fluidsystem.createCircleCollider(r, ox, oy)
 	local collider = {}
 
+	collider.collisionType = "circle"
 	collider.r = r or 8
+	collider.ox, collider.oy = ox or 0, oy or 0
 
 	return collider
 end
 
 -- Image collider takes in an image to calculate pixel perfect collision
-function fluidsystem.createPixelCollider(sx, sy, imagedata)
+function fluidsystem.createPixelCollider(sx, sy, imagedata, ox, oy)
 	local collider = {}
+
+	collider.collisionType = "pixel"
+	collider.ox, collider.oy = ox or 0, oy or 0
 
 	return collider
 end
 
 -- Basic box collision detection (c1/c2 arguments are the two colliders that should be checked for collision)
 function fluidsystem.boxCollision(c1, c2)
-	-- Convert this and the selected colliders types to those usable by box collision
-	local c1w = c1.collider.w or c1.collider.r or 16
-	local c1h = c1.collider.h or c1.collider.r or 16
+	local r1offset = c1.collider.r or 0
+	local r2offset = c2.collider.r or 0
 
-	local c2w = c2.collider.w or c2.collider.r or 16
-	local c2h = c2.collider.h or c2.collider.r or 16
+	-- Convert this and the selected colliders types to those usable by box collision
+	local c1w = c1.collider.w or c1.collider.r * 2 or 16
+	local c1h = c1.collider.h or c1.collider.r * 2 or 16
+
+	local c2w = c2.collider.w or c2.collider.r * 2 or 16
+	local c2h = c2.collider.h or c2.collider.r * 2 or 16
 
 	local c1x2, c1y2, c2x2, c2y2 = c1.x + c1w, c1.y + c1h, c2.x + c2w, c2.y + c2h
 
 	-- Returns true if a box collision was detected
 	if c1.x < c2x2 and c1x2 > c2.x and c1.y < c2y2 and c1y2 > c2.y then
 		return {c1.x, c1x2, c1.y, c1y2, c2.y, c2x2, c2.y, c2y2}
-	else
-		-- Return the new collision box
-		return {}
 	end
+
+	return false
 end
 
 -- Circle collision without the use of math.sqrt
@@ -256,8 +282,37 @@ function fluidsystem.pixelCollision(c1, c2)
 end
 
 -- Collision resolution functions
-function fluidsystem.boxResolution(c1, c2)
+function fluidsystem.boxResolution(c1, c2, f)
+	-- Offset calculation. Often used if the origins need to be repositioned.
+	-- Circles automatically receive offset calculations since their origins are at their center.
+	local c1radiusOffset = c1.collider.r or 0
+	local c2radiusOffset = c1.collider.r or 0
 
+	local friction = f or 1
+
+	local c1w = c1.collider.w or c1.collider.r * 2 or 16
+	local c1h = c1.collider.h or c1.collider.r * 2 or 16
+
+	if (c.x + offsetx) + cw - radiusOffset > screenWidth then
+		c.x = screenWidth - cw - offsetx + radiusOffset
+		c.vx = -(c.vx / 2)
+
+	elseif (c.x + offsetx) - radiusOffset < offsetx then
+		c.x = offsetx + radiusOffset
+		c.vx = -(c.vx / 2)
+	end
+
+	if (c.y + offsety) + ch - radiusOffset > screenHeight then
+		c.y = screenHeight - ch - offsety + radiusOffset
+		c.vy = -(c.vy / 2)
+
+		-- We are colliding from the top. Add friction.
+		c.vx = c.vx / friction
+
+	elseif (c.y + offsety) + radiusOffset < offsety then
+		c.y = offsety + radiusOffset
+		c.vy = -(c.vy / 2)
+	end
 end
 
 function fluidsystem.circleResolution(c1, c2)
@@ -270,10 +325,10 @@ function fluidsystem.circleResolution(c1, c2)
 	local jointMass = c1.mass + c2.mass
 	local differenceMass = c1.mass - c2.mass
 
-	local c1vx = (((c1.vx * differenceMass) + (2 *c2.mass * c2.vx)) / jointMass)
-	local c1vy = (((c1.vy * differenceMass) + (2 *c2.mass * c2.vy)) / jointMass)
-	local c2vx = (((c2.vx * differenceMass) + (2 *c1.mass * c1.vx)) / jointMass)
-	local c2vy = (((c2.vy * differenceMass) + (2 *c1.mass * c1.vy)) / jointMass)
+	local c1vx = (((c1.vx * differenceMass) + (2 * c2.mass * c2.vx)) / jointMass)
+	local c1vy = (((c1.vy * differenceMass) + (2 * c2.mass * c2.vy)) / jointMass)
+	local c2vx = (((c2.vx * differenceMass) + (2 * c1.mass * c1.vx)) / jointMass)
+	local c2vy = (((c2.vy * differenceMass) + (2 * c1.mass * c1.vy)) / jointMass)
 
 	c1.vx = c1vx
 	c1.vy = c1vy
@@ -287,24 +342,38 @@ function fluidsystem.pixelResolution(c1, c2)
 
 end
 
-function fluidsystem.screenResolution(c)
-	local cw = c.collider.w or c.collider.r or 16
-	local ch = c.collider.h or c.collider.r or 16
+-- Screen collision resolution is based on box collision.
+function fluidsystem.screenResolution(c, f)
+	-- Offset calculation. Often used if the origins need to be repositioned.
+	-- Circles automatically receive offset calculations since their origins are at their center.
+	local offsetx = c.collider.ox or 0
+	local offsety = c.collider.oy or 0
 
-	if c.y + ch > screenHeight then
-		c.y = screenHeight - cw
-		c.vy = -(c.vy / 2)
-		c.vx = c.vx / 1.005
-	elseif c.y - ch < 0 then
-		c.y = 0 + ch
-		c.vy = -(c.vy / 2)
+	local radiusOffset = c.collider.r or 0
+
+	local friction = f or 1
+
+	local cw = c.collider.w or c.collider.r * 2 or 16
+	local ch = c.collider.h or c.collider.r * 2 or 16
+
+	if (c.x + offsetx) + cw - radiusOffset > screenWidth then
+		c.x = screenWidth - cw - offsetx + radiusOffset
+		c.vx = -(c.vx / 2)
+
+	elseif (c.x + offsetx) - radiusOffset < offsetx then
+		c.x = offsetx + radiusOffset
+		c.vx = -(c.vx / 2)
 	end
 
-	if c.x - cw < 0 then
-		c.x = 0 + cw
-		c.vx = -(c.vx / 2)
-	elseif c.x + cw > screenWidth then
-		c.x = screenWidth - cw
-		c.vx = -(c.vx / 2)
+	if (c.y + offsety) + ch - radiusOffset > screenHeight then
+		c.y = screenHeight - ch - offsety + radiusOffset
+		c.vy = -(c.vy / 2)
+
+		-- We are colliding from the top. Add friction.
+		c.vx = c.vx / friction
+
+	elseif (c.y + offsety) + radiusOffset < offsety then
+		c.y = offsety + radiusOffset
+		c.vy = -(c.vy / 2)
 	end
-end
+end	
