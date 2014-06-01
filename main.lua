@@ -10,8 +10,8 @@ local fluid = {}
 function love.load()
 	fluid = fluidsystem.new()
 
-	for i=1, 4 do
-		for j=1, 1 do
+	for i=1, 8 do
+		for j=1, 8 do
 			fluid:addParticle(64 + i * 64, j * 64, math.random(-1,1), 0, nil, 16)
 		end
 	end

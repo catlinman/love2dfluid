@@ -121,20 +121,17 @@ function fluidsystem.new()
 			for j, particle2 in pairs(self.particles) do
 				-- Make sure we are not checking against an already checked particle
 				if particle2 ~= particle and not particle[particle2.id] then
-					if fluidsystem.boxCollision(particle, particle2) then
-						print("COL")
+					if fluidsystem.circleCollision(particle, particle2) then
 						fluidsystem.circleResolution(particle, particle2)
 
 						-- The particle has collided so we can assume that it's last position was outside of the collision. We reset the position.
 						particle.x = safex + particle.vx
 						particle.y = safey + particle.vy
-
-						-- Add the particles to the table of already resolutioned particles
 					end
 				end
 			
-				-- Check if the particle is out of bounds and resolve the collision
-				fluidsystem.screenResolution(particle2)
+				-- Check if the particle is out of bounds and resolve the collision. Second argument is the surface friction.
+				fluidsystem.screenResolution(particle2, 1.005)
 			end
 		end
 
@@ -196,12 +193,15 @@ function fluidsystem.destroy()
 	end
 end
 
+-- COLLIDER CREATION FUNCTIONS
+
 --[[
 	Collider data structure:
 	x and y are handled from the object the collider is a parent of.
 	The parent of the collider is passed to the collsion functions. NOT THE COLLIDER.
 	
 	->	Collision detection will fail if there is no x and y variable attached to the parent.
+	->	Collision detection will fail if there mass variable attached to the parent.
 
 	Every collider has either a 'w,h' and or a 'r' variable.
 	If it doesn't have one of these each function will generate one of the fly.
@@ -212,7 +212,6 @@ end
 	-> Collision detection will fail if there are no ox and oy members in the collider table.
 --]]
 
--- Fluid system collision handling
 function fluidsystem.createBoxCollider(w, h, ox, oy)
 	local collider = {}
 
@@ -244,6 +243,7 @@ function fluidsystem.createPixelCollider(sx, sy, imagedata, ox, oy)
 	return collider
 end
 
+-- COLLISION DETECTION FUNCTIONS
 -- Basic box collision detection (c1/c2 arguments are the two colliders that should be checked for collision)
 function fluidsystem.boxCollision(c1, c2)
 	local r1offset = c1.collider.r or 0
@@ -281,7 +281,7 @@ function fluidsystem.pixelCollision(c1, c2)
 
 end
 
--- Collision resolution functions
+-- COLLISION RESOLUTION FUNCTIONS
 function fluidsystem.boxResolution(c1, c2, f)
 	-- Offset calculation. Often used if the origins need to be repositioned.
 	-- Circles automatically receive offset calculations since their origins are at their center.
@@ -292,35 +292,6 @@ function fluidsystem.boxResolution(c1, c2, f)
 
 	local c1w = c1.collider.w or c1.collider.r * 2 or 16
 	local c1h = c1.collider.h or c1.collider.r * 2 or 16
-
-	if (c.x + offsetx) + cw - radiusOffset > screenWidth then
-		c.x = screenWidth - cw - offsetx + radiusOffset
-		c.vx = -(c.vx / 2)
-
-	elseif (c.x + offsetx) - radiusOffset < offsetx then
-		c.x = offsetx + radiusOffset
-		c.vx = -(c.vx / 2)
-	end
-
-	if (c.y + offsety) + ch - radiusOffset > screenHeight then
-		c.y = screenHeight - ch - offsety + radiusOffset
-		c.vy = -(c.vy / 2)
-
-		-- We are colliding from the top. Add friction.
-		c.vx = c.vx / friction
-
-	elseif (c.y + offsety) + radiusOffset < offsety then
-		c.y = offsety + radiusOffset
-		c.vy = -(c.vy / 2)
-	end
-end
-
-function fluidsystem.circleResolution(c1, c2)
-	local c1r = c1.collider.w or c1.collider.r or 8
-	local c2r = c2.collider.w or c2.collider.r or 8
-
-	local collisionPointX = ((c1.x * c2r) + (c2.x * c1r)) / (c1r + c2r)
-	local collisionPointY = ((c1.y * c2r) + (c2.y * c1r)) / (c1r + c2r)
 
 	local jointMass = c1.mass + c2.mass
 	local differenceMass = c1.mass - c2.mass
@@ -334,8 +305,28 @@ function fluidsystem.circleResolution(c1, c2)
 	c1.vy = c1vy
 	c2.vx = c2vx
 	c2.vy = c2vy
+end
 
-	return collisionPointX, collisionPointY
+function fluidsystem.circleResolution(c1, c2)
+	local c1r = c1.collider.w or c1.collider.r or 8
+	local c2r = c2.collider.w or c2.collider.r or 8
+
+	local collisionPointX = ((c1.x * c2r) + (c2.x * c1r)) / (c1r + c2r)
+	local collisionPointY = ((c1.y * c2r) + (c2.y * c1r)) / (c1r + c2r)
+
+	local nx = (c1.x - c2.x) / (c1r + c2r) 
+    local ny = (c1.y - c2.y) / (c1r + c2r) 
+    local a1 = c1.vx * nx + c1.vy * ny 
+    local a2 = c2.vx * nx + c2.vy * ny 
+    local p = 2 * (a1 - a2) / (c1.mass + c2.mass) 
+
+    c1.vx = c1.vx - p * nx * c2.mass 
+    c1.vy = c1.vy - p * ny * c2.mass 
+
+    c2.vx = c2.vx + p * nx * c1.mass 
+    c2.vy = c2.vy + p * ny * c1.mass
+
+    return collisionPointX, collisionPointY
 end
 
 function fluidsystem.pixelResolution(c1, c2)
