@@ -106,12 +106,14 @@ function fluidsystem.new()
 	-- Method to simulate a frame of the simulation. This is where the real deal takes place.
 	function system:simulate(dt)
 		for i, particle in pairs(self.particles) do
+			fluidsystem.screenResolution(particle, 1.005)
+
 			-- Add the system's gravity to the particles velocity
 			particle.vy = particle.vy + self.gravity
 
 			-- We save the last position this particle was in before it collided to avoid intersection issues
-			local safex = particle.x
-			local safey = particle.y
+			particle.lastx = particle.x
+			particle.lasty = particle.y
 
 			-- We apply each particles velocity to it's current position
 			particle.x = particle.x + particle.vx
@@ -120,24 +122,17 @@ function fluidsystem.new()
 			-- Perform collision detection and resolution here
 			for j, particle2 in pairs(self.particles) do
 				-- Make sure we are not checking against an already checked particle
-				if particle2 ~= particle and not particle[particle2.id] then
-					if fluidsystem.circleCollision(particle, particle2) then
-						fluidsystem.circleResolution(particle, particle2)
-
+				if particle2 ~= particle and not particle.collided[particle2.id] then
+					if fluidsystem.boxCollision(particle, particle2) then
+						fluidsystem.boxResolution(particle, particle2)
 						-- The particle has collided so we can assume that it's last position was outside of the collision. We reset the position.
-						particle.x = safex + particle.vx
-						particle.y = safey + particle.vy
+						particle.x = particle.lastx + particle.vx
+						particle.y = particle.lasty + particle.vy
+
+						particle2.collided[particle.id] = true
 					end
 				end
-			
-				-- Check if the particle is out of bounds and resolve the collision. Second argument is the surface friction.
-				fluidsystem.screenResolution(particle2, 1.005)
 			end
-		end
-
-		-- Clean up particle collision tables
-		for i, particle in pairs(self.particles) do
-			particle.collided = {}
 		end
 	end
 
@@ -292,6 +287,8 @@ function fluidsystem.boxResolution(c1, c2, f)
 
 	local c1w = c1.collider.w or c1.collider.r * 2 or 16
 	local c1h = c1.collider.h or c1.collider.r * 2 or 16
+	local c2w = c2.collider.w or c2.collider.r * 2 or 16
+	local c2h = c2.collider.h or c2.collider.r * 2 or 16
 
 	local jointMass = c1.mass + c2.mass
 	local differenceMass = c1.mass - c2.mass
@@ -301,10 +298,26 @@ function fluidsystem.boxResolution(c1, c2, f)
 	local c2vx = (((c2.vx * differenceMass) + (2 * c1.mass * c1.vx)) / jointMass)
 	local c2vy = (((c2.vy * differenceMass) + (2 * c1.mass * c1.vy)) / jointMass)
 
+	-- Check if the box could possibly have hit one of the sides
+	if c1.x - c1.vx + c1w > c2.x and c1.x - c1.vx < c2.x + c2w then
+		if c1.y - c1.vy + c1h < c2.y and c1.vy > 0 then
+			c1.y = c2.y - c1h
+		elseif c1.y - c1.vy >
+
+		end
+	elseif c1.y - c1.vy + c1h > c2.y and c1.y - c1.vy < c2.y + c2h then
+
+	end
+
 	c1.vx = c1vx
 	c1.vy = c1vy
 	c2.vx = c2vx
 	c2.vy = c2vy
+
+	c1.x = c1.x + c1.vx
+    c1.y = c1.y + c1.vy
+    c2.x = c2.x + c2.vx
+    c2.y = c2.y + c2.vy
 end
 
 function fluidsystem.circleResolution(c1, c2)
@@ -325,6 +338,11 @@ function fluidsystem.circleResolution(c1, c2)
 
     c2.vx = c2.vx + p * nx * c1.mass 
     c2.vy = c2.vy + p * ny * c1.mass
+
+    c1.x = c1.x + c1.vx
+    c1.y = c1.y + c1.vy
+    c2.x = c2.x + c2.vx
+    c2.y = c2.y + c2.vy
 
     return collisionPointX, collisionPointY
 end
