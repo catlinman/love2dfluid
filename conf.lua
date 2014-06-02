@@ -2,7 +2,7 @@ function love.conf(t)
     t.identity = "lovefluid"
     t.version = "0.9.0"
     t.console = true
-    t.window.title = "LOVEFluid simulation example"
+    t.window.title = "LOVEFluid Simulation Example"
     t.window.icon = nil
     t.window.width = 1024
     t.window.height = 768
@@ -13,7 +13,7 @@ function love.conf(t)
     t.window.fullscreen = false
     t.window.fullscreentype = "normal"
     t.window.vsync = true
-    t.window.fsaa = 0
+    t.window.fsaa = 4
     t.window.display = 1
     t.modules.audio = true
     t.modules.event = true

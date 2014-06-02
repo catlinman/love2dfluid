@@ -3,16 +3,16 @@ math.randomseed(os.time())
 require("fluidsystem")
 
 local strayTime = 0
-local timestep = 0.015
+local timestep = 0.01565
 
 local fluid = {}
 
 function love.load()
 	fluid = fluidsystem.new()
 
-	for i=1, 16 do
-		for j=1, 16 do
-			fluid:addParticle(32 + i * 32, j * 32, math.random(-100,100) / 100, math.random(-100,100) / 100, nil, 8)
+	for i=1, 12 do
+		for j=1, 8 do
+			fluid:addParticle(64 + i * 64, j * 64, math.random(-100,100) / 100, math.random(-100,100) / 100, nil, 16)
 		end
 	end
 end

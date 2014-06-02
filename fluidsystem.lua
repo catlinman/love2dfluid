@@ -38,11 +38,11 @@ fluidsystem = {} -- Global variable containing the functions used to create and 
 function fluidsystem.new()
 	local system = {}
 
-	-- This value defaults to 0.0981 since the system is intended for sidescrolling games. A value of zero might be useful for top down based games.
-	system.gravity = 0 --0.0981
-	system.mass = 1
-	system.damping = 1.01 -- How much particles lose velocity when not colliding
-	system.collisionDamping = 10 -- How much velocity is divided by when a collision occurs. Useful for particle clumping.
+	system.gravity = 0.0981 -- This value defaults to 0.0981 since the system is intended for sidescrolling games. A value of zero might be useful for top down based games.
+	system.mass = 1 -- Global mass of particles in this system.
+	system.damping = 1 -- How much particles lose velocity when not colliding. Velocity is divided by this number.
+	system.collisionDamping = 1 -- How much velocity is divided by when a collision occurs. Useful for particle clumping.
+	system.particleFriction = 1 -- How much x-velocity is lost when colliding with the top of flat surfaces. Values are multiplied.
 
 	-- Assign the current system id and increment it
 	system.id = id
@@ -111,7 +111,7 @@ function fluidsystem.new()
 	-- Method to simulate a frame of the simulation. This is where the real deal takes place.
 	function system:simulate(dt)
 		for i, particle in pairs(self.particles) do
-			fluidsystem.screenResolution(particle, 1.005)
+			fluidsystem.screenResolution(particle, 1.005, self.particleFriction, self.gravity)
 
 			-- Add the system's gravity to the particles velocity
 			particle.vy = particle.vy + self.gravity
@@ -140,13 +140,11 @@ function fluidsystem.new()
 
 			if not collided then
 				-- We save the last position this particle was in before it collided to avoid intersection issues
-				particle.lastx = particle.x
-				particle.lasty = particle.y
+				particle.lastx = particle.x - particle.vx
+				particle.lasty = particle.y - particle.vy
 			else
 				particle.x = particle.lastx 
 				particle.y = particle.lasty
-
-	
 			end
 		end
 	end
@@ -303,7 +301,7 @@ function fluidsystem.boxResolution(c1, c2, f, damping)
 	local c1radiusOffset = c1.collider.r or 0
 	local c2radiusOffset = c1.collider.r or 0
 
-	local friction = f or 1
+	local frictionForce = f or 1
 
 	local c1w = c1.collider.w or c1.collider.r * 2 or 16
 	local c1h = c1.collider.h or c1.collider.r * 2 or 16
@@ -323,7 +321,7 @@ function fluidsystem.boxResolution(c1, c2, f, damping)
 	if c1.x - c1.vx + c1w > c2.x and c1.x - c1.vx < c2.x + c2w then
 		if c1.y - c1.vy + c1h < c2.y and c1.vy > 0 then
 			c1.y = c2.y - c1h
-			c1.vx = c1.vx / friction
+			c1.vx = c1.vx * frictionForce
 		elseif c1.y - c1.vy > c2.y + c2h and c1.vy < 0 then
 			c1.y = c2.y + c2h
 		end
@@ -386,7 +384,7 @@ function fluidsystem.screenResolution(c, f)
 
 	local radiusOffset = c.collider.r or 0
 
-	local friction = f or 1
+	local frictionForce = f or 1
 
 	local cw = c.collider.w or c.collider.r * 2 or 16
 	local ch = c.collider.h or c.collider.r * 2 or 16
@@ -405,7 +403,7 @@ function fluidsystem.screenResolution(c, f)
 		c.vy = -(c.vy / 2)
 
 		-- We are colliding from the top. Add friction.
-		c.vx = c.vx / friction
+		c.vx = c.vx * frictionForce
 
 	elseif (c.y + offsety) - radiusOffset < offsety then
 		c.y = offsety + radiusOffset
