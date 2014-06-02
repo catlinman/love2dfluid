@@ -65,6 +65,10 @@ function fluidsystem.new()
 		particle.vx = vx or 0
 		particle.vy = vy or 0
 
+		-- Last position values
+		particle.lastx = particle.x
+		particle.lasty = particle.y
+
 		-- Table containing particles already collided with this one.
 		particle.collided = {}
 
@@ -111,27 +115,33 @@ function fluidsystem.new()
 			-- Add the system's gravity to the particles velocity
 			particle.vy = particle.vy + self.gravity
 
-			-- We save the last position this particle was in before it collided to avoid intersection issues
-			particle.lastx = particle.x
-			particle.lasty = particle.y
-
 			-- We apply each particles velocity to it's current position
 			particle.x = particle.x + particle.vx
 			particle.y = particle.y + particle.vy
+
+			local collided = false
 
 			-- Perform collision detection and resolution here
 			for j, particle2 in pairs(self.particles) do
 				-- Make sure we are not checking against an already checked particle
 				if particle2 ~= particle and not particle.collided[particle2.id] then
-					if fluidsystem.boxCollision(particle, particle2) then
-						fluidsystem.boxResolution(particle, particle2)
-						-- The particle has collided so we can assume that it's last position was outside of the collision. We reset the position.
-						particle.x = particle.lastx + particle.vx
-						particle.y = particle.lasty + particle.vy
-
-						particle2.collided[particle.id] = true
+					if fluidsystem.circleCollision(particle, particle2) then
+						fluidsystem.circleResolution(particle, particle2)
+						
+						collided = true
 					end
 				end
+			end
+
+			if not collided then
+				-- We save the last position this particle was in before it collided to avoid intersection issues
+				particle.lastx = particle.x
+				particle.lasty = particle.y
+			else
+				particle.x = particle.lastx 
+				particle.y = particle.lasty
+
+				fluidsystem.screenResolution(particle, 1.005)
 			end
 		end
 	end
@@ -142,8 +152,8 @@ function fluidsystem.new()
 
 		for i, particle in pairs(self.particles) do
 			love.graphics.setColor(particle.color)
-			love.graphics.circle("line", particle.x, particle.y, particle.r)
-			love.graphics.rectangle("line", particle.x - particle.r + particle.collider.ox, particle.y - particle.r + particle.collider.oy, particle.r * 2, particle.r * 2)
+			love.graphics.circle("fill", particle.x, particle.y, particle.r)
+			--love.graphics.rectangle("line", particle.x - particle.r + particle.collider.ox, particle.y - particle.r + particle.collider.oy, particle.r * 2, particle.r * 2)
 		end
 
 		love.graphics.setColor(255, 255, 255, 255) -- We reset the global color so we don't affect any other game drawing events
@@ -197,7 +207,7 @@ end
 	
 	->	Collision detection will fail if there is no x and y variable attached to the parent.
 	->	Collision detection will fail if there mass variable attached to the parent.
-
+	
 	Every collider has either a 'w,h' and or a 'r' variable.
 	If it doesn't have one of these each function will generate one of the fly.
 
@@ -205,6 +215,11 @@ end
 	the x- and y-coordinates in relation to the parents position.
 
 	-> Collision detection will fail if there are no ox and oy members in the collider table.
+
+	Note:
+		To resolve collisions without the use of TOI at the moment it is suggested to save the collider's
+		position before the collision and to restore it after the collision. Take a look at the particle code above
+		for further reference.
 --]]
 
 function fluidsystem.createBoxCollider(w, h, ox, oy)
@@ -302,11 +317,15 @@ function fluidsystem.boxResolution(c1, c2, f)
 	if c1.x - c1.vx + c1w > c2.x and c1.x - c1.vx < c2.x + c2w then
 		if c1.y - c1.vy + c1h < c2.y and c1.vy > 0 then
 			c1.y = c2.y - c1h
-		elseif c1.y - c1.vy >
-
+		elseif c1.y - c1.vy > c2.y + c2h and c1.vy < 0 then
+			c1.y = c2.y + c2h
 		end
 	elseif c1.y - c1.vy + c1h > c2.y and c1.y - c1.vy < c2.y + c2h then
-
+		if c1.x - c1.vx + c1w < c2.x and c1.vx > 0 then
+			c1.x = c2.x - c1w
+		elseif c1.x - c1.vx > c2.x + c2w and c1.vx < 0 then
+			c1.x = c2.x + c2w
+		end
 	end
 
 	c1.vx = c1vx
