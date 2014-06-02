@@ -38,10 +38,11 @@ fluidsystem = {} -- Global variable containing the functions used to create and 
 function fluidsystem.new()
 	local system = {}
 
-	-- This value defaults to 0.981 since the system is intended for sidescrolling games. A value of zero might be useful for top down based games.
-	system.gravity = 0.0981
+	-- This value defaults to 0.0981 since the system is intended for sidescrolling games. A value of zero might be useful for top down based games.
+	system.gravity = 0 --0.0981
 	system.mass = 1
-	system.damping = 1 -- How much particles lose velocity when not colliding
+	system.damping = 1.01 -- How much particles lose velocity when not colliding
+	system.collisionDamping = 10 -- How much velocity is divided by when a collision occurs. Useful for particle clumping.
 
 	-- Assign the current system id and increment it
 	system.id = id
@@ -115,6 +116,10 @@ function fluidsystem.new()
 			-- Add the system's gravity to the particles velocity
 			particle.vy = particle.vy + self.gravity
 
+			-- Damp the velocity. Good for when top down simulations are needed.
+			particle.vx = particle.vx / self.damping
+			particle.vy = particle.vy / self.damping
+
 			-- We apply each particles velocity to it's current position
 			particle.x = particle.x + particle.vx
 			particle.y = particle.y + particle.vy
@@ -126,7 +131,7 @@ function fluidsystem.new()
 				-- Make sure we are not checking against an already checked particle
 				if particle2 ~= particle and not particle.collided[particle2.id] then
 					if fluidsystem.circleCollision(particle, particle2) then
-						fluidsystem.circleResolution(particle, particle2)
+						fluidsystem.circleResolution(particle, particle2, self.collisionDamping)
 						
 						collided = true
 					end
@@ -292,7 +297,7 @@ function fluidsystem.pixelCollision(c1, c2)
 end
 
 -- COLLISION RESOLUTION FUNCTIONS
-function fluidsystem.boxResolution(c1, c2, f)
+function fluidsystem.boxResolution(c1, c2, f, damping)
 	-- Offset calculation. Often used if the origins need to be repositioned.
 	-- Circles automatically receive offset calculations since their origins are at their center.
 	local c1radiusOffset = c1.collider.r or 0
@@ -330,10 +335,10 @@ function fluidsystem.boxResolution(c1, c2, f)
 		end
 	end
 
-	c1.vx = c1vx
-	c1.vy = c1vy
-	c2.vx = c2vx
-	c2.vy = c2vy
+	c1.vx = c1vx / damping
+	c1.vy = c1vy / damping
+	c2.vx = c2vx / damping
+	c2.vy = c2vy / damping
 
 	c1.x = c1.x + c1.vx
     c1.y = c1.y + c1.vy
@@ -341,7 +346,7 @@ function fluidsystem.boxResolution(c1, c2, f)
     c2.y = c2.y + c2.vy
 end
 
-function fluidsystem.circleResolution(c1, c2)
+function fluidsystem.circleResolution(c1, c2, damping)
 	local c1r = c1.collider.w or c1.collider.r or 8
 	local c2r = c2.collider.w or c2.collider.r or 8
 
@@ -354,11 +359,10 @@ function fluidsystem.circleResolution(c1, c2)
     local a2 = c2.vx * nx + c2.vy * ny 
     local p = 2 * (a1 - a2) / (c1.mass + c2.mass) 
 
-    c1.vx = c1.vx - p * nx * c2.mass 
-    c1.vy = c1.vy - p * ny * c2.mass 
-
-    c2.vx = c2.vx + p * nx * c1.mass 
-    c2.vy = c2.vy + p * ny * c1.mass
+    c1.vx = (c1.vx - p * nx * c2.mass) / damping
+    c1.vy = (c1.vy - p * ny * c2.mass) / damping
+    c2.vx = (c2.vx + p * nx * c1.mass) / damping
+    c2.vy = (c2.vy + p * ny * c1.mass) / damping
 
     -- These are overwritten if the last position method is used.
     c1.x = c1.x + c1.vx
@@ -403,7 +407,7 @@ function fluidsystem.screenResolution(c, f)
 		-- We are colliding from the top. Add friction.
 		c.vx = c.vx / friction
 
-	elseif (c.y + offsety) + radiusOffset < offsety then
+	elseif (c.y + offsety) - radiusOffset < offsety then
 		c.y = offsety + radiusOffset
 		c.vy = -(c.vy / 2)
 	end
