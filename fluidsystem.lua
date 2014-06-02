@@ -141,7 +141,7 @@ function fluidsystem.new()
 				particle.x = particle.lastx 
 				particle.y = particle.lasty
 
-				fluidsystem.screenResolution(particle, 1.005)
+	
 			end
 		end
 	end
@@ -313,10 +313,12 @@ function fluidsystem.boxResolution(c1, c2, f)
 	local c2vx = (((c2.vx * differenceMass) + (2 * c1.mass * c1.vx)) / jointMass)
 	local c2vy = (((c2.vy * differenceMass) + (2 * c1.mass * c1.vy)) / jointMass)
 
-	-- Check if the box could possibly have hit one of the sides
+	-- Check if the box could possibly have hit one of the sides.
+	-- These are overwritten if the last position method is used.
 	if c1.x - c1.vx + c1w > c2.x and c1.x - c1.vx < c2.x + c2w then
 		if c1.y - c1.vy + c1h < c2.y and c1.vy > 0 then
 			c1.y = c2.y - c1h
+			c1.vx = c1.vx / friction
 		elseif c1.y - c1.vy > c2.y + c2h and c1.vy < 0 then
 			c1.y = c2.y + c2h
 		end
@@ -358,6 +360,7 @@ function fluidsystem.circleResolution(c1, c2)
     c2.vx = c2.vx + p * nx * c1.mass 
     c2.vy = c2.vy + p * ny * c1.mass
 
+    -- These are overwritten if the last position method is used.
     c1.x = c1.x + c1.vx
     c1.y = c1.y + c1.vy
     c2.x = c2.x + c2.vx
