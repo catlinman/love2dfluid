@@ -44,18 +44,18 @@ function fluidsystem.new()
 	system.y = 0
 	system.w = screenWidth
 	system.h = screenHeight
-	system.gravity = 0--.0981 -- This value defaults to 0.0981 since the system is intended for sidescrolling games. A value of zero might be useful for top down based games.
+	system.gravity = 0.0981 -- This value defaults to 0.0981 since the system is intended for sidescrolling games. A value of zero might be useful for top down based games.
 	system.mass = 1 -- Global mass of particles in this system.
 	system.damping = 1.0 -- How much particles lose velocity when not colliding. Velocity is divided by this number.
 	system.collisionDamping = 1.0 -- How much velocity is divided by when a collision occurs. Useful for particle clumping.
-	system.particleFriction = 0.5 -- How much x-velocity is lost when colliding with the top of flat surfaces. Values are multiplied.
+	system.particleFriction = 1.0 -- How much x-velocity is lost when colliding with the top of flat surfaces. Values are multiplied.
 	system.quadtree = {} -- Table containing the partitioned quadtrees
 	system.quadtreeMaxObjects = 16 -- The amount of objects needed in a cell before it splits
-	system.quadtreeMaxRecursion = 8
+	system.quadtreeMaxRecursion = 5
+	system.quadtreeIndex = 1
 
 	if drawQuads == true then
 		system.drawQuads = {} -- Table containing all quads to draw for debugging purposes
-		system.drawQuadId = 1
 	end
 
 	-- Assign the current system id and increment it
@@ -86,6 +86,7 @@ function fluidsystem.new()
 
 		-- Table containing particles already collided with this one.
 		particle.collided = {}
+		particle.collisionTable = {}
 
 		-- Color, radius, mass and collider
 		particle.color = color or {255, 255, 255, 255} -- Colors: {RED, GREEN, BLUE, ALPHA/OPACITY}
@@ -135,21 +136,22 @@ function fluidsystem.new()
 		quad.particles = {}
 		quad.valid = true
 		quad.level = l
-		quad.parent = p or nil
+		quad.parent = p
 		quad.collider = fluidsystem.createBoxCollider(quad.w, quad.h)
-		quad.childOrder = 1
+		quad.id = self.quadtreeIndex
 
 		if drawQuads == true then
-			self.drawQuads[self.drawQuadId] = quad
-			self.drawQuadId = self.drawQuadId + 1
+			self.quads[self.quadtreeIndex] = quad
 		end
-
+	
+		self.quadtreeIndex = self.quadtreeIndex + 1
+			
 		return quad
 	end
 
 	-- Divide a quad into four new quads
 	function system:splitQuad(quad)
-		--quad.valid = false -- Notify that the quad is now not in use
+		quad.valid = false
 		quad.childQuads = {}
 		quad.childQuads[1] = self:newQuad(quad.x, quad.y, quad.w / 2, quad.h / 2, quad.level + 1, quad)
 		quad.childQuads[2] = self:newQuad(quad.x + (quad.w / 2), quad.y, quad.w / 2, quad.h / 2, quad.level + 1, quad)
@@ -161,7 +163,7 @@ function fluidsystem.new()
 			for j, particle in pairs(quad.particles) do
 				if fluidsystem.boxCollision(childQuad, particle) then
 					childQuad.particles[particle.id] = particle
-					particle.collider.quad = childQuad
+					particle.collider.quads[childQuad.id] = childQuad
 					containing = containing + 1
 				end
 			end
@@ -179,23 +181,41 @@ function fluidsystem.new()
 
 	-- Function used to generate first time quadtrees. Currently only generates for particles.
 	function system:generateQuadtree()
-		self.quadId = 1
+		self.quads = {}
+
+		self.quadtreeIndex = 1
+
 		self.quadtree = self:newQuad(self.x, self.y, self.w, self.h, 1)
 		self.quadtree.particles = self.particles
 
 		if #self.particles > self.quadtreeMaxObjects then
+			for i, particle in pairs(self.particles) do
+				particle.collider.quads = {}
+			end
+
 			self:splitQuad(self.quadtree)
+		else
+			for i, particle in pairs(self.particles) do
+				self.quadtree.particles[particle.id] = particle
+				particle.collider.quads[self.quadtree.id] = self.quadtree
+			end
 		end
 	end
 
-	-- Check if the quadtree needs to be rebuilt
-	function system:validateQuadtree()
-
+	-- Used to revalidate a colliders quad if it moved out of it during the last frame
+	function system:validateQuadtreeCollider(c)
+		for i, quad in pairs(self.quads) do
+			if quad.valid then
+				if fluidsystem.boxCollision(quad, c) then
+					c.collider.quads[quad.id] = quad
+				end
+			end
+		end
 	end
 
 	-- Method to simulate a frame of the simulation. This is where the real deal takes place.
 	function system:simulate(dt)
-		--self:generateQuadtree()
+		self:generateQuadtree()
 
 		for i, particle in pairs(self.particles) do
 			-- Make sure the particle does not leave the fluidsystem
@@ -214,14 +234,22 @@ function fluidsystem.new()
 
 			local collided = false
 
+			particle.collisionTable = {}
+
+			self:validateQuadtreeCollider(particle)
+
 			-- Perform collision detection and resolution here
-			for j, particle2 in pairs(self.particles) do
-				-- Make sure we are not checking against an already checked particle
-				if particle2 ~= particle and not particle.collided[particle2.id] then
-					if fluidsystem.circleCollision(particle, particle2) then
-						fluidsystem.circleResolution(particle, particle2, self.collisionDamping)
-						
-						collided = true
+			for j, quad in pairs(particle.collider.quads) do
+				for k, particle2 in pairs(quad.particles) do
+					-- Make sure we are not checking against an already checked particle
+					if particle2 ~= particle and not particle.collisionTable[particle2.id] then
+						if fluidsystem.circleCollision(particle, particle2) then
+							fluidsystem.circleResolution(particle, particle2, self.collisionDamping)
+							
+							particle.collisionTable[particle2.id] = true
+							particle2.collisionTable[particle.id] = true
+							collided = true
+						end
 					end
 				end
 			end
@@ -234,6 +262,10 @@ function fluidsystem.new()
 				particle.x = particle.lastx 
 				particle.y = particle.lasty
 			end
+		end
+
+		for i, particle in pairs(self.particles) do
+			particle.collisionTable = {}
 		end
 	end
 
@@ -248,7 +280,7 @@ function fluidsystem.new()
 		end
 
 		if drawQuads == true then
-			for i, quad in pairs(self.drawQuads) do
+			for i, quad in pairs(self.quads) do
 				love.graphics.rectangle("line", quad.x, quad.y, quad.w, quad.h)	
 			end
 		end
@@ -326,6 +358,7 @@ function fluidsystem.createBoxCollider(w, h, ox, oy)
 	collider.w = w or 16
 	collider.h = h or 16
 	collider.ox, collider.oy = ox or 0, oy or 0
+	collider.quads = {}
 
 	return collider
 end
@@ -336,6 +369,7 @@ function fluidsystem.createCircleCollider(r, ox, oy)
 	collider.collisionType = "circle"
 	collider.r = r or 8
 	collider.ox, collider.oy = ox or 0, oy or 0
+	collider.quads = {}
 
 	return collider
 end
@@ -346,6 +380,7 @@ function fluidsystem.createPixelCollider(sx, sy, imagedata, ox, oy)
 
 	collider.collisionType = "pixel"
 	collider.ox, collider.oy = ox or 0, oy or 0
+	collider.quads = {}
 
 	return collider
 end
