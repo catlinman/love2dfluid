@@ -11,9 +11,9 @@ local loops = 0
 function love.load()
 	fluid = fluidsystem.new()
 
-	for i=1, 28 do
-		for j=1, 8 do
-			fluid:addParticle(32 + i * 32, 32 + j * 32, math.random(-100,100) / 100, math.random(-100,100) / 100, nil, 8)
+	for i=1, 30 do
+		for j=1, 22 do
+			fluid:addParticle(16 + i * 32, 32 + j * 32, math.random(-100,100) / 100, math.random(-100,100) / 100, nil, 6)
 		end
 	end
 

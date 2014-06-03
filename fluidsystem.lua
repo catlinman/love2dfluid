@@ -46,11 +46,11 @@ function fluidsystem.new()
 	system.h = screenHeight
 	system.gravity = 0.0981 -- This value defaults to 0.0981 since the system is intended for sidescrolling games. A value of zero might be useful for top down based games.
 	system.mass = 1 -- Global mass of particles in this system.
-	system.damping = 1.0 -- How much particles lose velocity when not colliding. Velocity is divided by this number.
-	system.collisionDamping = 1.0 -- How much velocity is divided by when a collision occurs. Useful for particle clumping.
+	system.damping = 1.000 -- How much particles lose velocity when not colliding. Velocity is divided by this number.
+	system.collisionDamping = 1.1 -- How much velocity is divided by when a collision occurs. Useful for particle clumping.
 	system.particleFriction = 1.0 -- How much x-velocity is lost when colliding with the top of flat surfaces. Values are multiplied.
 	system.quadtree = {} -- Table containing the partitioned quadtrees
-	system.quadtreeMaxObjects = 16 -- The amount of objects needed in a cell before it splits
+	system.quadtreeMaxObjects = 48 -- The amount of objects needed in a cell before it splits. 48 seems to be the sweet spot
 	system.quadtreeMaxRecursion = 5
 	system.quadtreeIndex = 1
 
