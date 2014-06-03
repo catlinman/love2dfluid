@@ -50,7 +50,7 @@ function fluidsystem.new()
 	system.collisionDamping = 1.0 -- How much velocity is divided by when a collision occurs. Useful for particle clumping.
 	system.particleFriction = 0.5 -- How much x-velocity is lost when colliding with the top of flat surfaces. Values are multiplied.
 	system.quadtree = {} -- Table containing the partitioned quadtrees
-	system.quadtreeMaxObjects = 8 -- The amount of objects needed in a cell before it splits
+	system.quadtreeMaxObjects = 16 -- The amount of objects needed in a cell before it splits
 	system.quadtreeMaxRecursion = 8
 
 	if drawQuads == true then
@@ -156,7 +156,6 @@ function fluidsystem.new()
 		quad.childQuads[3] = self:newQuad(quad.x, quad.y + (quad.h / 2), quad.w / 2, quad.h / 2, quad.level + 1, quad)
 		quad.childQuads[4] = self:newQuad(quad.x + (quad.w / 2), quad.y + (quad.h / 2), quad.w / 2, quad.h / 2, quad.level + 1, quad)
 
-
 		for i, childQuad in pairs(quad.childQuads) do
 			local containing = 0
 			for j, particle in pairs(quad.particles) do
@@ -165,13 +164,11 @@ function fluidsystem.new()
 					particle.collider.quad = childQuad
 					containing = containing + 1
 				end
-
-				if containing >= self.quadtreeMaxObjects then
-					if childQuad.level < self.quadtreeMaxRecursion then
-						print("Too many objects in the quad. Splitting at level " ..childQuad.level)
-						self:splitQuad(childQuad)
-						break
-					end
+			end
+				
+			if containing >= self.quadtreeMaxObjects then
+				if childQuad.level < self.quadtreeMaxRecursion then
+					self:splitQuad(childQuad)
 				end
 			end
 		end
@@ -187,7 +184,6 @@ function fluidsystem.new()
 		self.quadtree.particles = self.particles
 
 		if #self.particles > self.quadtreeMaxObjects then
-			print("Too many objects in the base quad. Creating first child iteration.")
 			self:splitQuad(self.quadtree)
 		end
 	end
@@ -370,7 +366,7 @@ function fluidsystem.boxCollision(c1, c2)
 	local c1x2, c1y2, c2x2, c2y2 = c1.x + c1w, c1.y + c1h, c2.x + c2w, c2.y + c2h
 
 	-- Returns true if a box collision was detected
-	if c1.x < c2x2 and c1x2 > c2.x and c1.y < c2y2 and c1y2 > c2.y then
+	if c1.x - r1offset < c2x2 - r2offset and c1x2 - r1offset > c2.x - r2offset and c1.y - r1offset < c2y2 - r2offset and c1y2 - r1offset > c2.y - r2offset then
 		return {c1.x, c1x2, c1.y, c1y2, c2.y, c2x2, c2.y, c2y2}
 	end
 

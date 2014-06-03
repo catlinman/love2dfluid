@@ -24,6 +24,8 @@ function love.load()
 end
 
 function love.update(dt)
+	love.window.setTitle("FPS: " .. love.timer.getFPS())
+	
 	strayTime = strayTime + dt
 
 	while strayTime >= timestep do
