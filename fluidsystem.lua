@@ -32,6 +32,8 @@ local screenWidth, screenHeight = love.graphics.getWidth(), love.graphics.getHei
 local systems = {} -- Table containing the fluid systems
 local id = 1 -- Fluid system reference identification
 
+local drawQuads = true
+
 fluidsystem = {} -- Global variable containing the functions used to create and modify the fluid system
 
 -- Calling this function instantiates a new fluid system
@@ -42,11 +44,19 @@ function fluidsystem.new()
 	system.y = 0
 	system.w = screenWidth
 	system.h = screenHeight
-	system.gravity = 0.0981 -- This value defaults to 0.0981 since the system is intended for sidescrolling games. A value of zero might be useful for top down based games.
+	system.gravity = 0--.0981 -- This value defaults to 0.0981 since the system is intended for sidescrolling games. A value of zero might be useful for top down based games.
 	system.mass = 1 -- Global mass of particles in this system.
 	system.damping = 1 -- How much particles lose velocity when not colliding. Velocity is divided by this number.
 	system.collisionDamping = 1 -- How much velocity is divided by when a collision occurs. Useful for particle clumping.
 	system.particleFriction = 0.5 -- How much x-velocity is lost when colliding with the top of flat surfaces. Values are multiplied.
+	system.quadtree = {} -- Table containing the partitioned quadtrees
+	system.quadtreeMaxObjects = 4 -- The amount of objects needed in a cell before it splits
+	system.quadtreeMaxRecursion = 4
+
+	if drawQuads == true then
+		system.drawQuads = {} -- Table containing all quads to draw for debugging purposes
+		system.drawQuadId = 1
+	end
 
 	-- Assign the current system id and increment it
 	system.id = id
@@ -119,8 +129,74 @@ function fluidsystem.new()
 		end
 	end
 
+	function system:newQuad(x, y, w, h, l, p)
+		local quad = {}
+		quad.x, quad.y, quad.w, quad.h = x, y, w, h
+		quad.particles = {}
+		quad.valid = true
+		quad.level = l
+		quad.parent = p or nil
+		quad.collider = fluidsystem.createBoxCollider(quad.w, quad.h)
+		quad.childOrder = 1
+
+		if drawQuads == true then
+			self.drawQuads[self.drawQuadId] = quad
+			self.drawQuadId = self.drawQuadId + 1
+		end
+
+		return quad
+	end
+
+	-- Divide a quad into four new quads
+	function system:splitQuad(quad)
+		--quad.valid = false -- Notify that the quad is now not in use
+		quad.childQuads = {}
+		quad.childQuads[1] = self:newQuad(quad.x, quad.y, quad.w / 2, quad.h / 2, quad.level + 1, quad)
+		quad.childQuads[2] = self:newQuad(quad.x + (quad.w / 2), quad.y, quad.w / 2, quad.h / 2, quad.level + 1, quad)
+		quad.childQuads[3] = self:newQuad(quad.x, quad.y + (quad.h / 2), quad.w / 2, quad.h / 2, quad.level + 1, quad)
+		quad.childQuads[4] = self:newQuad(quad.x + (quad.w / 2), quad.y + (quad.h / 2), quad.w / 2, quad.h / 2, quad.level + 1, quad)
+
+		for i, childQuad in pairs(quad.childQuads) do
+			local containing = 0
+			for j, particle in pairs(quad.particles) do
+				if fluidsystem.boxCollision(childQuad, particle) then
+					childQuad.particles[particle.id] = particle
+					particle.collider.quad = childQuad
+					containing = containing + 1
+				end
+
+				if containing > self.quadtreeMaxObjects then
+					if quad.level < self.quadtreeMaxRecursion then
+						self:splitQuad(childQuad)
+					end
+				end
+			end
+		end
+
+		-- Clear the table of particles
+		quad.particles = {}
+	end
+
+	-- Function used to generate first time quadtrees. Currently only generates for particles.
+	function system:generateQuadtree()
+		self.quadId = 1
+		self.quadtree = self:newQuad(self.x, self.y, self.w, self.h, 1)
+		self.quadtree.particles = self.particles
+
+		if #self.particles > self.quadtreeMaxObjects then
+			self:splitQuad(self.quadtree)
+		end
+	end
+
+	-- Check if the quadtree needs to be rebuilt
+	function system:validateQuadtree()
+
+	end
+
 	-- Method to simulate a frame of the simulation. This is where the real deal takes place.
 	function system:simulate(dt)
+		--self:generateQuadtree()
+		
 		for i, particle in pairs(self.particles) do
 			-- Make sure the particle does not leave the fluidsystem
 			fluidsystem.screenResolution(particle, self.particleFriction, self.x, self.y, self.w, self.h)
@@ -169,6 +245,12 @@ function fluidsystem.new()
 			love.graphics.setColor(particle.color)
 			love.graphics.circle("fill", particle.x, particle.y, particle.r)
 			--love.graphics.rectangle("line", particle.x - particle.r + particle.collider.ox, particle.y - particle.r + particle.collider.oy, particle.r * 2, particle.r * 2)
+		end
+
+		if drawQuads == true then
+			for i, quad in pairs(self.drawQuads) do
+				love.graphics.rectangle("line", quad.x, quad.y, quad.w, quad.h)	
+			end
 		end
 
 		love.graphics.setColor(255, 255, 255, 255) -- We reset the global color so we don't affect any other game drawing events

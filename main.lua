@@ -13,9 +13,14 @@ function love.load()
 
 	for i=1, 12 do
 		for j=1, 8 do
-			fluid:addParticle(64 + i * 64, j * 64, math.random(-100,100) / 100, math.random(-100,100) / 100, nil, 8)
+			fluid:addParticle(32 + i * 32, j * 32, 0, 0, nil, 8)
 		end
 	end
+
+	fluid:generateQuadtree()
+
+	collectgarbage("setstepmul", 200)
+	collectgarbage("setpause", 105)
 end
 
 function love.update(dt)
@@ -28,6 +33,8 @@ function love.update(dt)
 
 		loops = loops + 1
 	end
+
+	collectgarbage()
 end
 
 function love.draw()
