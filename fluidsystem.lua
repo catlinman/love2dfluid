@@ -38,11 +38,15 @@ fluidsystem = {} -- Global variable containing the functions used to create and 
 function fluidsystem.new()
 	local system = {}
 
+	system.x = 0
+	system.y = 0
+	system.w = screenWidth
+	system.h = screenHeight
 	system.gravity = 0.0981 -- This value defaults to 0.0981 since the system is intended for sidescrolling games. A value of zero might be useful for top down based games.
 	system.mass = 1 -- Global mass of particles in this system.
 	system.damping = 1 -- How much particles lose velocity when not colliding. Velocity is divided by this number.
 	system.collisionDamping = 1 -- How much velocity is divided by when a collision occurs. Useful for particle clumping.
-	system.particleFriction = 1 -- How much x-velocity is lost when colliding with the top of flat surfaces. Values are multiplied.
+	system.particleFriction = 0.5 -- How much x-velocity is lost when colliding with the top of flat surfaces. Values are multiplied.
 
 	-- Assign the current system id and increment it
 	system.id = id
@@ -92,7 +96,7 @@ function fluidsystem.new()
 	function system:removeParticle(id)
 		-- Lookup the particle by it's id in the particle table
 		if self.particles[id] then
-			self.particles[id] = nil -- Destory the particle reference
+			self.particles[id] = nil -- Destroy the particle reference
 		end
 	end
 
@@ -104,14 +108,22 @@ function fluidsystem.new()
 	end
 
 	-- Apply an impulse at the given coordinates using the following method
-	function system:applyImpulse(x, y, strength)
-
+	function system:applyImpulse(x, y, force)
+		for i, particle in pairs(self.particles) do
+			local dx, dy = particle.x - x, particle.y - y
+			local lenght = math.sqrt((dx * dx) + (dy * dy)) 
+			local dist = math.sqrt((x - particle.x)^2 + (y - particle.y)^2)
+			local x2, y2 = dx / lenght, dy / lenght
+			particle.vx = particle.vx + x2 * force / dist
+			particle.vy = particle.vy + y2 * force / dist
+		end
 	end
 
 	-- Method to simulate a frame of the simulation. This is where the real deal takes place.
 	function system:simulate(dt)
 		for i, particle in pairs(self.particles) do
-			fluidsystem.screenResolution(particle, 1.005, self.particleFriction, self.gravity)
+			-- Make sure the particle does not leave the fluidsystem
+			fluidsystem.screenResolution(particle, self.particleFriction, self.x, self.y, self.w, self.h)
 
 			-- Add the system's gravity to the particles velocity
 			particle.vy = particle.vy + self.gravity
@@ -295,13 +307,14 @@ function fluidsystem.pixelCollision(c1, c2)
 end
 
 -- COLLISION RESOLUTION FUNCTIONS
-function fluidsystem.boxResolution(c1, c2, f, damping)
+function fluidsystem.boxResolution(c1, c2, f, d)
 	-- Offset calculation. Often used if the origins need to be repositioned.
 	-- Circles automatically receive offset calculations since their origins are at their center.
 	local c1radiusOffset = c1.collider.r or 0
-	local c2radiusOffset = c1.collider.r or 0
+	local c2radiusOffset = c2.collider.r or 0
 
 	local frictionForce = f or 1
+	local damping = d or 1
 
 	local c1w = c1.collider.w or c1.collider.r * 2 or 16
 	local c1h = c1.collider.h or c1.collider.r * 2 or 16
@@ -344,7 +357,43 @@ function fluidsystem.boxResolution(c1, c2, f, damping)
     c2.y = c2.y + c2.vy
 end
 
-function fluidsystem.circleResolution(c1, c2, damping)
+function fluidsystem.innerBoxResolution(c1, c2, f, d)
+	local c1radiusOffset = c1.collider.r or 0
+	local c2radiusOffset = c2.collider.r or 0
+
+	local frictionForce = f or 1
+
+	local c1w = c1.collider.w or c1.collider.r * 2 or 16
+	local c1h = c1.collider.h or c1.collider.r * 2 or 16
+	local c2w = c2.collider.w or c2.collider.r * 2 or 16
+	local c2h = c2.collider.h or c2.collider.r * 2 or 16
+
+	if c1.x + cw - c1radiusOffset > c2.x + c2w then
+		c1.x = c2.x + c2w - c1w + c1radiusOffset
+		c1.vx = -(c1.vx / 2)
+
+	elseif c1.x - c1radiusOffset < c2.x then
+		c1.x = c2.x + c1radiusOffset
+		c1.vx = -(c1.vx / 2)
+	end
+
+	if c1.y + c1h - c1radiusOffset > c2.y + c2h then
+		c1.y = c2.y + c2h - c1h + c1radiusOffset
+		c1.vy = -(c1.vy / 2)
+
+		-- We are colliding from the top. Add friction.
+		c1.vx = c1.vx * frictionForce
+
+	elseif c1.y - c1radiusOffset < c2.y then
+		c1.y = c2.y + c1radiusOffset
+		c1.vy = -(c1.vy / 2)
+	end
+end
+
+-- TODO: Add offset handling
+function fluidsystem.circleResolution(c1, c2, d)
+	local damping = d or 1
+
 	local c1r = c1.collider.w or c1.collider.r or 8
 	local c2r = c2.collider.w or c2.collider.r or 8
 
@@ -376,7 +425,7 @@ function fluidsystem.pixelResolution(c1, c2)
 end
 
 -- Screen collision resolution is based on box collision.
-function fluidsystem.screenResolution(c, f)
+function fluidsystem.screenResolution(c, f, x, y, w, h)
 	-- Offset calculation. Often used if the origins need to be repositioned.
 	-- Circles automatically receive offset calculations since their origins are at their center.
 	local offsetx = c.collider.ox or 0
@@ -389,24 +438,29 @@ function fluidsystem.screenResolution(c, f)
 	local cw = c.collider.w or c.collider.r * 2 or 16
 	local ch = c.collider.h or c.collider.r * 2 or 16
 
-	if (c.x + offsetx) + cw - radiusOffset > screenWidth then
-		c.x = screenWidth - cw - offsetx + radiusOffset
+	local sx = x or 0
+	local sy = y or 0
+	local sw = w or screenWidth or 0
+	local sh = h or screenHeight or 0
+
+	if (c.x + offsetx) + cw - radiusOffset > sx + sw then
+		c.x = sx + sw - cw - offsetx + radiusOffset
 		c.vx = -(c.vx / 2)
 
-	elseif (c.x + offsetx) - radiusOffset < offsetx then
-		c.x = offsetx + radiusOffset
+	elseif (c.x + offsetx) - radiusOffset < sx + offsetx then
+		c.x = sx + offsetx + radiusOffset
 		c.vx = -(c.vx / 2)
 	end
 
-	if (c.y + offsety) + ch - radiusOffset > screenHeight then
-		c.y = screenHeight - ch - offsety + radiusOffset
+	if (c.y + offsety) + ch - radiusOffset > sy + sh then
+		c.y = sy + sh - ch - offsety + radiusOffset
 		c.vy = -(c.vy / 2)
 
 		-- We are colliding from the top. Add friction.
 		c.vx = c.vx * frictionForce
 
-	elseif (c.y + offsety) - radiusOffset < offsety then
-		c.y = offsety + radiusOffset
+	elseif (c.y + offsety) - radiusOffset < sy + offsety then
+		c.y = sy + offsety + radiusOffset
 		c.vy = -(c.vy / 2)
 	end
 end	
