@@ -32,7 +32,9 @@ local screenWidth, screenHeight = love.graphics.getWidth(), love.graphics.getHei
 local systems = {} -- Table containing the fluid systems
 local id = 1 -- Fluid system reference identification
 
+-- Setting this to true draws the quadtree dividers
 local drawQuads = true
+local useShader = true
 
 fluidsystem = {} -- Global variable containing the functions used to create and modify the fluid system
 
@@ -101,6 +103,12 @@ function fluidsystem.new()
 		-- Add the particle to this system's particle table
 		self.particles[particle.id] = particle
 
+		self:generateQuadtree()
+
+		if useShader == true then
+			self:generateFluidshader()
+		end
+
 		return particle
 	end
 
@@ -109,12 +117,24 @@ function fluidsystem.new()
 		if self.particles[id] then
 			self.particles[id] = nil -- Destroy the particle reference
 		end
+
+		self:generateQuadtree()
+
+		if useShader == true then
+			self:generateFluidshader()
+		end
 	end
 
 	-- Removes all particles from the fluid system
 	function system:removeAllParticles()
 		for i, particle in pairs(self.particles) do
 			particle = nil
+		end
+
+		self:generateQuadtree()
+
+		if useShader == true then
+			self:generateFluidshader()
 		end
 	end
 
@@ -213,9 +233,59 @@ function fluidsystem.new()
 		end
 	end
 
+	function system:constructVectorTable(table)
+		local t = {}
+		for k, v in pairs(table) do
+			t[k] = {v.x, screenHeight - v.y}
+		end
+
+		return t
+	end
+
+	-- Needs to be done when a new particle is added or removed
+	function system:generateFluidshader()
+		if self.particles then
+			self.fluideffect = love.graphics.newShader(([[
+				#define NPARTICLES %d
+				extern vec2[NPARTICLES] particles;
+				extern float radius;
+
+				float metaball(vec2 x)
+				{
+					x /= radius;
+					return 1.0 / (dot(x, x) + .000001);
+
+				}
+
+				vec4 effect(vec4 color, Image tex, vec2 tc, vec2 pc)
+				{
+					float p = 0.0;
+					for (int i = 0; i < NPARTICLES; ++i) p += metaball(pc - particles[i]);
+					p = (ceil(p) / 2.0);
+					return vec4(p);
+				}
+			]]):format(#self.particles))
+
+			local vectorTable = self:constructVectorTable(self.particles)
+
+			self.fluideffect:send("particles", unpack(vectorTable))
+			self.fluideffect:send("radius", self.particles[1].r)
+		end
+	end
+
+	-- Update the particle positions
+	function system:updateFluidshader()
+		if self.particles and self.fluideffect then
+			local vectorTable = self:constructVectorTable(self.particles)
+
+			self.fluideffect:send("particles", unpack(vectorTable))
+		end
+	end
+
 	-- Method to simulate a frame of the simulation. This is where the real deal takes place.
 	function system:simulate(dt)
 		self:generateQuadtree()
+		self:updateFluidshader()
 
 		for i, particle in pairs(self.particles) do
 			-- Make sure the particle does not leave the fluidsystem
@@ -271,13 +341,18 @@ function fluidsystem.new()
 
 	-- Method to draw the current state of the fluid simulation
 	function system:draw()
-		-- love.graphics.setPixelEffect(metaeffect)
-
-		for i, particle in pairs(self.particles) do
-			love.graphics.setColor(particle.color)
-			love.graphics.circle("fill", particle.x, particle.y, particle.r)
-			--love.graphics.rectangle("line", particle.x - particle.r + particle.collider.ox, particle.y - particle.r + particle.collider.oy, particle.r * 2, particle.r * 2)
+		if self.fluideffect then
+			love.graphics.setShader(self.fluideffect)
+			love.graphics.rectangle('fill', 0,0, love.graphics.getWidth(), love.graphics.getHeight())
+		else
+			for i, particle in pairs(self.particles) do
+				love.graphics.setColor(particle.color)
+				love.graphics.circle("fill", particle.x, particle.y, particle.r)
+				--love.graphics.rectangle("line", particle.x - particle.r + particle.collider.ox, particle.y - particle.r + particle.collider.oy, particle.r * 2, particle.r * 2)
+			end
 		end
+
+		love.graphics.setShader()
 
 		if drawQuads == true then
 			for i, quad in pairs(self.quads) do
@@ -286,8 +361,6 @@ function fluidsystem.new()
 		end
 
 		love.graphics.setColor(255, 255, 255, 255) -- We reset the global color so we don't affect any other game drawing events
-
-		-- love.graphics.setPixelEffect()
 	end
 
 	-- Add this new fluid system to the table of all currently instantiated systems

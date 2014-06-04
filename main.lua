@@ -11,13 +11,11 @@ local loops = 0
 function love.load()
 	fluid = fluidsystem.new()
 
-	for i=1, 30 do
+	for i=1, 22 do
 		for j=1, 22 do
-			fluid:addParticle(16 + i * 32, 32 + j * 32, math.random(-100,100) / 100, math.random(-100,100) / 100, nil, 6)
+			fluid:addParticle(i * 42, 32 + j * 32, math.random(-1000,1000) / 100, math.random(-1000,1000) / 100, nil, 8)
 		end
 	end
-
-	fluid:generateQuadtree()
 
 	collectgarbage("setstepmul", 200)
 	collectgarbage("setpause", 105)
@@ -42,10 +40,6 @@ end
 function love.draw()
 	love.graphics.print("Click to apply force to the particles", 16, 16)
 	fluid:draw()
-end
-
-function love.keypressed(key)
-	print(loops)
 end
 
 function love.mousepressed(x, y, button)
