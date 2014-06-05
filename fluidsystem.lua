@@ -32,10 +32,6 @@ local screenWidth, screenHeight = love.graphics.getWidth(), love.graphics.getHei
 local systems = {} -- Table containing the fluid systems
 local id = 1 -- Fluid system reference identification
 
--- Setting this to true draws the quadtree dividers
-local drawQuads = true
-local useShader = true
-
 fluidsystem = {} -- Global variable containing the functions used to create and modify the fluid system
 
 -- Calling this function instantiates a new fluid system
@@ -56,9 +52,11 @@ function fluidsystem.new()
 	system.quadtreeMaxRecursion = 5
 	system.quadtreeIndex = 1
 
-	if drawQuads == true then
-		system.drawQuads = {} -- Table containing all quads to draw for debugging purposes
-	end
+	system.useShader = true
+	system.showQuads = true
+
+	system.drawQuads = {} -- Table containing all quads to draw for debugging purposes
+
 
 	-- Assign the current system id and increment it
 	system.id = id
@@ -101,7 +99,7 @@ function fluidsystem.new()
 
 		self:generateQuadtree()
 
-		if useShader == true then
+		if self.useShader == true then
 			self:generateFluidshader()
 		end
 
@@ -116,7 +114,7 @@ function fluidsystem.new()
 
 		self:generateQuadtree()
 
-		if useShader == true then
+		if self.useShader == true then
 			self:generateFluidshader()
 		end
 	end
@@ -124,13 +122,15 @@ function fluidsystem.new()
 	-- Removes all particles from the fluid system
 	function system:removeAllParticles()
 		for i, particle in pairs(self.particles) do
-			particle = nil
+			self.particles[particle.id] = nil
 		end
+
+		self.particleId = 1
 
 		self:generateQuadtree()
 
-		if useShader == true then
-			self:generateFluidshader()
+		if self.useShader == true then
+			self.fluideffect = nil
 		end
 	end
 
@@ -156,9 +156,7 @@ function fluidsystem.new()
 		quad.collider = fluidsystem.createBoxCollider(quad.w, quad.h)
 		quad.id = self.quadtreeIndex
 
-		if drawQuads == true then
-			self.quads[self.quadtreeIndex] = quad
-		end
+		self.quads[self.quadtreeIndex] = quad
 	
 		self.quadtreeIndex = self.quadtreeIndex + 1
 			
@@ -326,7 +324,7 @@ function fluidsystem.new()
 
 	-- Method to draw the current state of the fluid simulation
 	function system:draw()
-		if self.fluideffect then
+		if self.fluideffect and self.useShader == true then
 			love.graphics.setColor(0,0,0,255)
 			love.graphics.setShader(self.fluideffect)
 			love.graphics.rectangle('fill', 0,0, love.graphics.getWidth(), love.graphics.getHeight())
@@ -340,9 +338,11 @@ function fluidsystem.new()
 
 		love.graphics.setShader()
 
-		if drawQuads == true then
-			for i, quad in pairs(self.quads) do
-				love.graphics.rectangle("line", quad.x, quad.y, quad.w, quad.h)	
+		if self.showQuads == true then
+			if self.quads then
+				for i, quad in pairs(self.quads) do
+					love.graphics.rectangle("line", quad.x, quad.y, quad.w, quad.h)	
+				end
 			end
 		end
 
