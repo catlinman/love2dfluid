@@ -3,7 +3,7 @@ math.randomseed(os.time())
 require("fluidsystem")
 
 local strayTime = 0
-local timestep = 0.01565 -- 70 FPS - Increasing this value will make simulating faster at the exspense of accuracy
+local timestep = 0.018
 
 local fluid = {}
 
@@ -21,7 +21,7 @@ function love.load()
 end
 
 function love.update(dt)
-	love.window.setTitle("FPS: " .. love.timer.getFPS())
+	love.window.setTitle("LOVEFluid Simulation Example - FPS: " .. love.timer.getFPS())
 
 	strayTime = strayTime + dt
 
@@ -33,7 +33,7 @@ function love.update(dt)
 
 		if love.mouse.isDown("l") then
 			local x, y = love.mouse.getPosition()
-			fluid:applyImpulse(x, y, 5)
+			fluid:applyImpulse(x, y, 25)
 		end
 	end
 
@@ -53,16 +53,16 @@ function love.mousepressed(x, y, button)
 	if button == "l" then
 		fluid:applyImpulse(x, y, 250)
 	elseif button == "r" then
-		if #fluid.particles < 512 then
+		if #fluid.particles < 400 then
 			fluid:addParticle(x, y, math.random(-1000,1000) / 100, math.random(-1000,1000) / 100, nil, 8)
 		end
 	end
 end
 
 function love.keypressed(keycode)
-	if #fluid.particles < 512 then
+	if #fluid.particles < 400 then
 		if keycode == "+" or keycode == "kp+" then
-			fluid:addParticle(math.random(32, 1024 - 32), math.random(32, 768 - 32), math.random(-1000,1000) / 100, math.random(-1000,1000) / 100, nil, 8)
+			fluid:addParticle(math.random(32, love.graphics.getWidth() - 32), math.random(32, love.graphics.getHeight() - 200), 0, 0, nil, 8)
 		end
 	end
 
@@ -71,10 +71,10 @@ function love.keypressed(keycode)
 	end
 
 	if keycode == "s" then
-		if fluid.useShader == true then 
-			fluid.useShader = false
+		if fluid.drawshader == true then 
+			fluid.drawshader = false
 		else
-			fluid.useShader = true
+			fluid.drawshader = true
 			if #fluid.particles > 0 then
 				fluid:generateFluidshader()
 			end
@@ -82,10 +82,15 @@ function love.keypressed(keycode)
 	end
 
 	if keycode == "q" then
-		if fluid.showQuads == true then 
-			fluid.showQuads = false
+		if fluid.drawquads == true then 
+			fluid.drawquads = false
 		else
-			fluid.showQuads = true
+			fluid.drawquads = true
 		end
 	end
+end
+
+function love.resize(w, h)
+	fluid.w = love.graphics.getWidth()
+	fluid.h = love.graphics.getHeight()
 end

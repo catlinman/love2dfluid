@@ -26,7 +26,6 @@
 	Use the fluid.get() function to return a reference to one of the currently loaded fluid systems.
 -]]
 
-local screenWidth, screenHeight = love.graphics.getWidth(), love.graphics.getHeight() -- Currently used to keep particles in the screen area
 local systems = {} -- Table containing the fluid systems
 local id = 1 -- Fluid system reference identification
 
@@ -35,11 +34,12 @@ fluidsystem = {} -- Global variable containing the functions used to create and 
 -- Calling this function instantiates a new fluid system. The Arugment is a table containing all the information needed for the particlesystem.
 function fluidsystem.new(params)
 	local system = {}
+	local params = params or {} -- Make sure we don't cause null reference errors if there were no paramaters supplied.
 
 	system.x = params.x or 0
 	system.y = params.y or 0
-	system.w = params.w or screenWidth
-	system.h = params.h or screenHeight
+	system.w = params.w or love.graphics.getWidth()
+	system.h = params.h or love.graphics.getHeight()
 
 	system.gravity = params.g or params.gravity or 0.0981 -- This value defaults to 0.0981 since the system is intended for sidescrolling games. A value of zero might be useful for top down based games.
 	system.mass = params.m or params.gravity or 1 -- Global mass of particles in this system.
@@ -98,7 +98,7 @@ function fluidsystem.new(params)
 		-- The quadtree has to be rebuilt. The same must be done with the shader if needed.
 		self:generateQuadtree()
 		if self.drawshader == true then
-			self.fluideffect = nil
+			self:generateFluidshader()
 		end
 
 		return particle
@@ -237,7 +237,7 @@ function fluidsystem.new(params)
 	function system:constructVectorTable(table)
 		local t = {}
 		for k, v in pairs(table) do
-			t[k] = {v.x, screenHeight - v.y}
+			t[k] = {v.x, love.graphics.getHeight() - v.y}
 		end
 
 		return t
@@ -631,8 +631,8 @@ function fluidsystem.screenResolution(c, f, x, y, w, h)
 
 	local sx = x or 0
 	local sy = y or 0
-	local sw = w or screenWidth or 0
-	local sh = h or screenHeight or 0
+	local sw = w or love.graphics.getWidth() or 0
+	local sh = h or love.graphics.getHeight() or 0
 
 	if (c.x + offsetx) + cw - radiusOffset > sx + sw then
 		c.x = sx + sw - cw - offsetx + radiusOffset
