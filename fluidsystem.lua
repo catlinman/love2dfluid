@@ -86,10 +86,6 @@ function fluidsystem.new()
 		particle.lastx = particle.x
 		particle.lasty = particle.y
 
-		-- Table containing particles already collided with this one.
-		particle.collided = {}
-		particle.collisionTable = {}
-
 		-- Color, radius, mass and collider
 		particle.color = color or {255, 255, 255, 255} -- Colors: {RED, GREEN, BLUE, ALPHA/OPACITY}
 		particle.r = r or 8
@@ -250,15 +246,12 @@ function fluidsystem.new()
 				extern vec2[NPARTICLES] particles;
 				extern float radius;
 
-				float metaball(vec2 x)
-				{
+				float metaball(vec2 x){
 					x /= radius;
 					return 1.0 / (dot(x, x) + .000001);
-
 				}
 
-				vec4 effect(vec4 color, Image tex, vec2 tc, vec2 pc)
-				{
+				vec4 effect(vec4 color, Image tex, vec2 tc, vec2 pc){
 					float p = 0.0;
 					for (int i = 0; i < NPARTICLES; ++i) p += metaball(pc - particles[i]);
 					p = (ceil(p) / 2.0);
@@ -304,20 +297,16 @@ function fluidsystem.new()
 
 			local collided = false
 
-			particle.collisionTable = {}
-
 			self:validateQuadtreeCollider(particle)
 
 			-- Perform collision detection and resolution here
 			for j, quad in pairs(particle.collider.quads) do
 				for k, particle2 in pairs(quad.particles) do
 					-- Make sure we are not checking against an already checked particle
-					if particle2 ~= particle and not particle.collisionTable[particle2.id] then
+					if particle2 ~= particle then
 						if fluidsystem.circleCollision(particle, particle2) then
 							fluidsystem.circleResolution(particle, particle2, self.collisionDamping)
 							
-							particle.collisionTable[particle2.id] = true
-							particle2.collisionTable[particle.id] = true
 							collided = true
 						end
 					end
@@ -333,15 +322,12 @@ function fluidsystem.new()
 				particle.y = particle.lasty
 			end
 		end
-
-		for i, particle in pairs(self.particles) do
-			particle.collisionTable = {}
-		end
 	end
 
 	-- Method to draw the current state of the fluid simulation
 	function system:draw()
 		if self.fluideffect then
+			love.graphics.setColor(0,0,0,255)
 			love.graphics.setShader(self.fluideffect)
 			love.graphics.rectangle('fill', 0,0, love.graphics.getWidth(), love.graphics.getHeight())
 		else

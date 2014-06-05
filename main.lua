@@ -3,7 +3,7 @@ math.randomseed(os.time())
 require("fluidsystem")
 
 local strayTime = 0
-local timestep = 0.01565
+local timestep = 0.02 -- 70 FPS - Increasing this value will make simulating faster at the exspense of accuracy
 
 local fluid = {}
 local loops = 0
@@ -11,9 +11,12 @@ local loops = 0
 function love.load()
 	fluid = fluidsystem.new()
 
-	for i=1, 22 do
-		for j=1, 22 do
-			fluid:addParticle(i * 42, 32 + j * 32, math.random(-1000,1000) / 100, math.random(-1000,1000) / 100, nil, 8)
+	local num = 128
+	local actual = math.ceil(math.sqrt(num))
+	
+	for i=1, actual do
+		for j=1, actual do
+			fluid:addParticle(i * 64, 64 + j * 64, math.random(-1000,1000) / 100, math.random(-1000,1000) / 100, nil, 8)
 		end
 	end
 
@@ -26,6 +29,7 @@ function love.update(dt)
 
 	strayTime = strayTime + dt
 
+	-- This while loop makes updates occur in set increments
 	while strayTime >= timestep do
 		strayTime = strayTime - timestep
 
