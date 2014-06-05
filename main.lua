@@ -30,6 +30,11 @@ function love.update(dt)
 		strayTime = strayTime - timestep
 
 		fluidsystem.update(timestep)
+
+		if love.mouse.isDown("l") then
+			local x, y = love.mouse.getPosition()
+			fluid:applyImpulse(x, y, 5)
+		end
 	end
 
 	collectgarbage()

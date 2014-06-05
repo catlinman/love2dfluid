@@ -26,37 +26,35 @@
 	Use the fluid.get() function to return a reference to one of the currently loaded fluid systems.
 -]]
 
--- Currently used to keep particles in the screen area
-local screenWidth, screenHeight = love.graphics.getWidth(), love.graphics.getHeight()
-
+local screenWidth, screenHeight = love.graphics.getWidth(), love.graphics.getHeight() -- Currently used to keep particles in the screen area
 local systems = {} -- Table containing the fluid systems
 local id = 1 -- Fluid system reference identification
 
 fluidsystem = {} -- Global variable containing the functions used to create and modify the fluid system
 
--- Calling this function instantiates a new fluid system
-function fluidsystem.new()
+-- Calling this function instantiates a new fluid system. The Arugment is a table containing all the information needed for the particlesystem.
+function fluidsystem.new(params)
 	local system = {}
 
-	system.x = 0
-	system.y = 0
-	system.w = screenWidth
-	system.h = screenHeight
-	system.gravity = 0.0981 -- This value defaults to 0.0981 since the system is intended for sidescrolling games. A value of zero might be useful for top down based games.
-	system.mass = 1 -- Global mass of particles in this system.
-	system.damping = 1.000 -- How much particles lose velocity when not colliding. Velocity is divided by this number.
-	system.collisionDamping = 1.1 -- How much velocity is divided by when a collision occurs. Useful for particle clumping.
-	system.particleFriction = 1.0 -- How much x-velocity is lost when colliding with the top of flat surfaces. Values are multiplied.
+	system.x = params.x or 0
+	system.y = params.y or 0
+	system.w = params.w or screenWidth
+	system.h = params.h or screenHeight
+
+	system.gravity = params.g or params.gravity or 0.0981 -- This value defaults to 0.0981 since the system is intended for sidescrolling games. A value of zero might be useful for top down based games.
+	system.mass = params.m or params.gravity or 1 -- Global mass of particles in this system.
+	system.damping = params.damping or params.airdamping or 1.000 -- How much particles lose velocity when not colliding. Velocity is divided by this number.
+	system.collisionDamping = params.collisiondamping or 1.1 -- How much velocity is divided by when a collision occurs. Useful for particle clumping.
+	system.particleFriction = params.friction or params.particlefriction or 1.0 -- How much x-velocity is lost when colliding with the top of flat surfaces. Values are multiplied.
+
 	system.quadtree = {} -- Table containing the partitioned quadtrees
-	system.quadtreeMaxObjects = 48 -- The amount of objects needed in a cell before it splits. 48 seems to be the sweet spot
-	system.quadtreeMaxRecursion = 5
+	system.quads = {}
+	system.quadtreeMaxObjects = params.maxquadobjects or 48 -- The amount of objects needed in a cell before it splits. 48 seems to be the sweet spot
+	system.quadtreeMaxRecursion = params.maxquadrecursion or 5 
 	system.quadtreeIndex = 1
 
-	system.useShader = true
-	system.showQuads = true
-
-	system.drawQuads = {} -- Table containing all quads to draw for debugging purposes
-
+	system.drawshader = params.drawshader or true
+	system.drawquads = params.drawquads or true
 
 	-- Assign the current system id and increment it
 	system.id = id
@@ -68,7 +66,7 @@ function fluidsystem.new()
 	system.colliders = {} -- Table containing a set of objects that particles can collide with
 	system.affectors = {} -- Table containing objects that affect the flow of particles
 
-	-- Add and remove particles using the following two methods
+	-- Add and remove particles using the following two methods.
 	function system:addParticle(x, y, vx, vy, color, r, mass)
 		local particle = {} -- Create a new particle contained in a table
 
@@ -97,25 +95,26 @@ function fluidsystem.new()
 		-- Add the particle to this system's particle table
 		self.particles[particle.id] = particle
 
+		-- The quadtree has to be rebuilt. The same must be done with the shader if needed.
 		self:generateQuadtree()
-
-		if self.useShader == true then
-			self:generateFluidshader()
+		if self.drawshader == true then
+			self.fluideffect = nil
 		end
 
 		return particle
 	end
 
+	-- Removes a single particle by the particle's id
 	function system:removeParticle(id)
 		-- Lookup the particle by it's id in the particle table
 		if self.particles[id] then
 			self.particles[id] = nil -- Destroy the particle reference
-		end
 
-		self:generateQuadtree()
-
-		if self.useShader == true then
-			self:generateFluidshader()
+			-- The quadtree has to be rebuilt. The same must be done with the shader if needed.
+			self:generateQuadtree()
+			if self.drawshader == true then
+				self:generateFluidshader()
+			end
 		end
 	end
 
@@ -125,16 +124,22 @@ function fluidsystem.new()
 			self.particles[particle.id] = nil
 		end
 
+		-- Reset the particle index to one.
 		self.particleId = 1
 
+		-- The quadtree has to be rebuilt. The same must be done with the shader if needed.
 		self:generateQuadtree()
 
-		if self.useShader == true then
+		if self.drawshader == true then
 			self.fluideffect = nil
 		end
 	end
 
-	-- Apply an impulse at the given coordinates using the following method
+	function system:returnParticleCount()
+		return #self.particles
+	end
+
+	-- Apply an impulse at the given coordinates using the following method.
 	function system:applyImpulse(x, y, force)
 		for i, particle in pairs(self.particles) do
 			local dx, dy = particle.x - x, particle.y - y
@@ -146,6 +151,7 @@ function fluidsystem.new()
 		end
 	end
 
+	-- Generates a new quad used by the quadtree
 	function system:newQuad(x, y, w, h, l, p)
 		local quad = {}
 		quad.x, quad.y, quad.w, quad.h = x, y, w, h
@@ -163,7 +169,7 @@ function fluidsystem.new()
 		return quad
 	end
 
-	-- Divide a quad into four new quads
+	-- Divide a quad into four new quads.
 	function system:splitQuad(quad)
 		quad.valid = false
 		quad.childQuads = {}
@@ -189,7 +195,7 @@ function fluidsystem.new()
 			end
 		end
 
-		-- Clear the table of particles
+		-- Clear the table of particles for this invalidated quad.
 		quad.particles = {}
 	end
 
@@ -227,6 +233,7 @@ function fluidsystem.new()
 		end
 	end
 
+	-- Takes in a table and filters out the x and y variables into a new table. Screen coordinates are also changed to real coordiantes for use in shaders.
 	function system:constructVectorTable(table)
 		local t = {}
 		for k, v in pairs(table) do
@@ -257,6 +264,7 @@ function fluidsystem.new()
 				}
 			]]):format(#self.particles))
 
+			-- Convert the particles to a plain vector table.
 			local vectorTable = self:constructVectorTable(self.particles)
 
 			self.fluideffect:send("particles", unpack(vectorTable))
@@ -264,7 +272,7 @@ function fluidsystem.new()
 		end
 	end
 
-	-- Update the particle positions
+	-- Update the shader by giving it the new particle positions
 	function system:updateFluidshader()
 		if self.particles and self.fluideffect then
 			local vectorTable = self:constructVectorTable(self.particles)
@@ -293,6 +301,7 @@ function fluidsystem.new()
 			particle.x = particle.x + particle.vx
 			particle.y = particle.y + particle.vy
 
+			-- This variable stores if a single collision was detected
 			local collided = false
 
 			self:validateQuadtreeCollider(particle)
@@ -305,17 +314,18 @@ function fluidsystem.new()
 						if fluidsystem.circleCollision(particle, particle2) then
 							fluidsystem.circleResolution(particle, particle2, self.collisionDamping)
 							
-							collided = true
+							collided = true -- A collision was detected and so the collided variable must be set to true.
 						end
 					end
 				end
 			end
 
 			if not collided then
-				-- We save the last position this particle was in before it collided to avoid intersection issues
+				-- We save the last position this particle was in before it collided to avoid intersection issues.
 				particle.lastx = particle.x - particle.vx
 				particle.lasty = particle.y - particle.vy
 			else
+				-- We reset the particle's position to one outside of any collisions.
 				particle.x = particle.lastx 
 				particle.y = particle.lasty
 			end
@@ -324,7 +334,7 @@ function fluidsystem.new()
 
 	-- Method to draw the current state of the fluid simulation
 	function system:draw()
-		if self.fluideffect and self.useShader == true then
+		if self.fluideffect and self.drawshader == true then
 			love.graphics.setColor(0,0,0,255)
 			love.graphics.setShader(self.fluideffect)
 			love.graphics.rectangle('fill', 0,0, love.graphics.getWidth(), love.graphics.getHeight())
@@ -336,9 +346,11 @@ function fluidsystem.new()
 			end
 		end
 
+		-- Reset the shader so it does not influence other systems and draw calls.
 		love.graphics.setShader()
 
-		if self.showQuads == true then
+		-- Draw quads if it is desired.
+		if self.drawquads == true then
 			if self.quads then
 				for i, quad in pairs(self.quads) do
 					love.graphics.rectangle("line", quad.x, quad.y, quad.w, quad.h)	
@@ -346,7 +358,8 @@ function fluidsystem.new()
 			end
 		end
 
-		love.graphics.setColor(255, 255, 255, 255) -- We reset the global color so we don't affect any other game drawing events
+		-- We reset the global color so we don't affect any other game drawing events
+		love.graphics.setColor(255, 255, 255, 255)
 	end
 
 	-- Add this new fluid system to the table of all currently instantiated systems
@@ -410,6 +423,7 @@ end
 		for further reference.
 --]]
 
+-- Creates a new box collider. The Arguments ox and oy are the base offset from the parent object's position values.
 function fluidsystem.createBoxCollider(w, h, ox, oy)
 	local collider = {}
 
@@ -422,6 +436,7 @@ function fluidsystem.createBoxCollider(w, h, ox, oy)
 	return collider
 end
 
+-- Creates a new circle collider. The Arguments ox and oy are the base offset from the parent object's position values.
 function fluidsystem.createCircleCollider(r, ox, oy)
 	local collider = {}
 
@@ -433,7 +448,7 @@ function fluidsystem.createCircleCollider(r, ox, oy)
 	return collider
 end
 
--- Image collider takes in an image to calculate pixel perfect collision
+-- Image collider takes in an image to calculate pixel perfect collision. The Arguments ox and oy are the base offset from the parent object's position values.
 function fluidsystem.createPixelCollider(sx, sy, imagedata, ox, oy)
 	local collider = {}
 
