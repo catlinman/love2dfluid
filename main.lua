@@ -46,7 +46,7 @@ function love.draw()
 	love.graphics.print("Press 'delete' to remove all particles", 16, 60)
 	love.graphics.print("Toggle the shader by pressing 's' / Toggle Quadtrees by pressing 'q'", 16, 80)
 	love.graphics.print("Total particles: " ..#fluid.particles, 16, 100)
-	fluid:draw()
+	fluidsystem:draw()
 end
 
 function love.mousepressed(x, y, button)

@@ -223,7 +223,7 @@ function fluidsystem.new(params)
 	end
 
 	-- Used to revalidate a colliders quad if it moved out of it during the last frame
-	function system:validateQuadtreeCollider(c)
+	function system:updateQuadtreeCollider(c)
 		for i, quad in pairs(self.quads) do
 			if quad.valid then
 				if fluidsystem.boxCollision(quad, c) then
@@ -304,7 +304,7 @@ function fluidsystem.new(params)
 			-- This variable stores if a single collision was detected
 			local collided = false
 
-			self:validateQuadtreeCollider(particle)
+			self:updateQuadtreeCollider(particle)
 
 			-- Perform collision detection and resolution here
 			for j, quad in pairs(particle.collider.quads) do
@@ -462,15 +462,17 @@ end
 -- COLLISION DETECTION FUNCTIONS
 -- Basic box collision detection (c1/c2 arguments are the two colliders that should be checked for collision)
 function fluidsystem.boxCollision(c1, c2)
-	local r1offset = c1.collider.r or 0
-	local r2offset = c2.collider.r or 0
-
-	-- Convert this and the selected colliders types to those usable by box collision
+	-- We make sure that all possible variables are defined. Cross collision type handling is also done here.
+	local c1x = c1.x or c1.position.x or 0
+	local c1y = c1.y or c1.position.y or 0
+	local c2x = c2.x or c2.position.x or 0
+	local c2y = c2.y or c2.position.y or 0
 	local c1w = c1.collider.w or c1.collider.r * 2 or 16
 	local c1h = c1.collider.h or c1.collider.r * 2 or 16
-
 	local c2w = c2.collider.w or c2.collider.r * 2 or 16
 	local c2h = c2.collider.h or c2.collider.r * 2 or 16
+	local r1offset = c1.collider.r or 0
+	local r2offset = c2.collider.r or 0
 
 	local c1x2, c1y2, c2x2, c2y2 = c1.x + c1w, c1.y + c1h, c2.x + c2w, c2.y + c2h
 
@@ -499,85 +501,103 @@ end
 
 -- COLLISION RESOLUTION FUNCTIONS
 function fluidsystem.boxResolution(c1, c2, f, d)
-	-- Offset calculation. Often used if the origins need to be repositioned.
-	-- Circles automatically receive offset calculations since their origins are at their center.
-	local c1radiusOffset = c1.collider.r or 0
-	local c2radiusOffset = c2.collider.r or 0
-
 	local frictionForce = f or 1
 	local damping = d or 1
 
+	-- We make sure that all possible variables are defined. Cross collision type handling is also done here.
+	local c1x = c1.x or c1.position.x or 0
+	local c1y = c1.y or c1.position.y or 0
+	local c2x = c2.x or c2.position.x or 0
+	local c2y = c2.y or c2.position.y or 0
 	local c1w = c1.collider.w or c1.collider.r * 2 or 16
 	local c1h = c1.collider.h or c1.collider.r * 2 or 16
 	local c2w = c2.collider.w or c2.collider.r * 2 or 16
 	local c2h = c2.collider.h or c2.collider.r * 2 or 16
-
-	local jointMass = c1.mass + c2.mass
-	local differenceMass = c1.mass - c2.mass
-
-	local c1vx = (((c1.vx * differenceMass) + (2 * c2.mass * c2.vx)) / jointMass)
-	local c1vy = (((c1.vy * differenceMass) + (2 * c2.mass * c2.vy)) / jointMass)
-	local c2vx = (((c2.vx * differenceMass) + (2 * c1.mass * c1.vx)) / jointMass)
-	local c2vy = (((c2.vy * differenceMass) + (2 * c1.mass * c1.vy)) / jointMass)
-
-	-- Check if the box could possibly have hit one of the sides.
-	-- These are overwritten if the last position method is used.
-	if c1.x - c1.vx + c1w > c2.x and c1.x - c1.vx < c2.x + c2w then
-		if c1.y - c1.vy + c1h < c2.y and c1.vy > 0 then
-			c1.y = c2.y - c1h
-			c1.vx = c1.vx * frictionForce
-		elseif c1.y - c1.vy > c2.y + c2h and c1.vy < 0 then
-			c1.y = c2.y + c2h
-		end
-	elseif c1.y - c1.vy + c1h > c2.y and c1.y - c1.vy < c2.y + c2h then
-		if c1.x - c1.vx + c1w < c2.x and c1.vx > 0 then
-			c1.x = c2.x - c1w
-		elseif c1.x - c1.vx > c2.x + c2w and c1.vx < 0 then
-			c1.x = c2.x + c2w
-		end
-	end
-
-	c1.vx = c1vx / damping
-	c1.vy = c1vy / damping
-	c2.vx = c2vx / damping
-	c2.vy = c2vy / damping
-
-	c1.x = c1.x + c1.vx
-    c1.y = c1.y + c1.vy
-    c2.x = c2.x + c2.vx
-    c2.y = c2.y + c2.vy
-end
-
-function fluidsystem.innerBoxResolution(c1, c2, f, d)
+	local c1vx = c1.vx or 0
+	local c1vy = c1.vy or 0
+	local c2vx = c2.vx or 0
+	local c2vy = c2.vy or 0
+	local c1mass = c1.mass or 1
+	local c2mass = c2.mass or 1
 	local c1radiusOffset = c1.collider.r or 0
 	local c2radiusOffset = c2.collider.r or 0
 
-	local frictionForce = f or 1
+	local jointMass = c1mass + c2mass
+	local differenceMass = c1mass - c2mass
 
+	local c1vxNew = (((c1vx * differenceMass) + (2 * c2mass * c2vx)) / jointMass)
+	local c1vyNew = (((c1vy * differenceMass) + (2 * c2mass * c2vy)) / jointMass)
+	local c2vxNew = (((c2vx * differenceMass) + (2 * c1mass * c1vx)) / jointMass)
+	local c2vyNew = (((c2vy * differenceMass) + (2 * c1mass * c1vy)) / jointMass)
+
+	-- Check if the box could possibly have hit one of the sides.
+	-- Position values are overwritten for particles by resetting them to their old positions.
+	if c1x - c1vx + c1w > c2x and c1x - c1vx < c2x + c2w then
+		if c1y - c1vy + c1h < c2y and c1vy > 0 then
+			c1.y = c2y - c1h
+			c1.vx = c1vx * frictionForce
+		elseif c1y - c1vy > c2y + c2h and c1vy < 0 then
+			c1.y = c2.y + c2h
+		end
+	elseif c1y - c1vy + c1h > c2y and c1y - c1vy < c2y + c2h then
+		if c1x - c1vx + c1w < c2x and c1vx > 0 then
+			c1.x = c2x - c1w
+		elseif c1x - c1vx > c2x + c2w and c1vx < 0 then
+			c1.x = c2x + c2w
+		end
+	end
+
+	c1.vx = c1vxNew / damping
+	c1.vy = c1vyNew / damping
+	c2.vx = c2vxNew / damping
+	c2.vy = c2vyNew / damping
+
+	-- Position values are overwritten for particles by resetting them to their old positions.
+	c1.x = c1x + c1vx
+    c1.y = c1y + c1vy
+    c2.x = c2x + c2vx
+    c2.y = c2y + c2vy
+end
+
+function fluidsystem.innerBoxResolution(c1, c2, f)
+	local friction = f or 1
+
+	-- We make sure that all possible variables are defined. Cross collision type handling is also done here.
+	local c1x = c1.x or c1.position.x or 0
+	local c1y = c1.y or c1.position.y or 0
+	local c2x = c2.x or c2.position.x or 0
+	local c2y = c2.y or c2.position.y or 0
 	local c1w = c1.collider.w or c1.collider.r * 2 or 16
 	local c1h = c1.collider.h or c1.collider.r * 2 or 16
 	local c2w = c2.collider.w or c2.collider.r * 2 or 16
 	local c2h = c2.collider.h or c2.collider.r * 2 or 16
+	local c1vx = c1.vx or 0
+	local c1vy = c1.vy or 0
+	local c2vx = c2.vx or 0
+	local c2vy = c2.vy or 0
+	local c1radiusOffset = c1.collider.r or 0
+	local c2radiusOffset = c2.collider.r or 0
 
-	if c1.x + cw - c1radiusOffset > c2.x + c2w then
-		c1.x = c2.x + c2w - c1w + c1radiusOffset
-		c1.vx = -(c1.vx / 2)
+	-- Position values are overwritten for particles by resetting them to their old positions.
+	if c1x + c1w - c1radiusOffset > c2x + c2w then
+		c1.x = c2x + c2w - c1w + c1radiusOffset
+		c1.vx = -(c1vx / 2)
 
-	elseif c1.x - c1radiusOffset < c2.x then
-		c1.x = c2.x + c1radiusOffset
-		c1.vx = -(c1.vx / 2)
+	elseif c1x - c1radiusOffset < c2x then
+		c1.x = c2x + c1radiusOffset
+		c1.vx = -(c1vx / 2)
 	end
 
-	if c1.y + c1h - c1radiusOffset > c2.y + c2h then
-		c1.y = c2.y + c2h - c1h + c1radiusOffset
-		c1.vy = -(c1.vy / 2)
+	if c1y + c1h - c1radiusOffset > c2y + c2h then
+		c1.y = c2y + c2h - c1h + c1radiusOffset
+		c1.vy = -(c1vy / 2)
 
 		-- We are colliding from the top. Add friction.
-		c1.vx = c1.vx * frictionForce
+		c1.vx = c1vx * friction
 
-	elseif c1.y - c1radiusOffset < c2.y then
-		c1.y = c2.y + c1radiusOffset
-		c1.vy = -(c1.vy / 2)
+	elseif c1y - c1radiusOffset < c2y then
+		c1.y = c2y + c1radiusOffset
+		c1.vy = -(c1vy / 2)
 	end
 end
 
@@ -585,28 +605,40 @@ end
 function fluidsystem.circleResolution(c1, c2, d)
 	local damping = d or 1
 
+	-- We make sure that all possible variables are defined. Cross collision type handling is also done here.
+	local c1x = c1.x or c1.position.x or 0
+	local c1y = c1.y or c1.position.y or 0
+	local c2x = c2.x or c2.position.x or 0
+	local c2y = c2.y or c2.position.y or 0
+	local c1vx = c1.vx or 0
+	local c1vy = c1.vy or 0
+	local c2vx = c2.vx or 0
+	local c2vy = c2.vy or 0
 	local c1r = c1.collider.w or c1.collider.r or 8
 	local c2r = c2.collider.w or c2.collider.r or 8
+	local c1mass = c1.mass or 1
+	local c2mass = c2.mass or 1
 
-	local collisionPointX = ((c1.x * c2r) + (c2.x * c1r)) / (c1r + c2r)
-	local collisionPointY = ((c1.y * c2r) + (c2.y * c1r)) / (c1r + c2r)
+	-- Position at which the collision occured
+	local collisionPointX = ((c1x * c2r) + (c2x * c1r)) / (c1r + c2r)
+	local collisionPointY = ((c1y * c2r) + (c2y * c1r)) / (c1r + c2r)
 
-	local nx = (c1.x - c2.x) / (c1r + c2r) 
-    local ny = (c1.y - c2.y) / (c1r + c2r) 
-    local a1 = c1.vx * nx + c1.vy * ny 
-    local a2 = c2.vx * nx + c2.vy * ny 
-    local p = 2 * (a1 - a2) / (c1.mass + c2.mass) 
+	local nx = (c1x - c2x) / (c1r + c2r) 
+    local ny = (c1y - c2y) / (c1r + c2r) 
+    local a1 = c1vx * nx + c1vy * ny 
+    local a2 = c2vx * nx + c2vy * ny 
+    local p = 2 * (a1 - a2) / (c1mass + c2mass) 
 
-    c1.vx = (c1.vx - p * nx * c2.mass) / damping
-    c1.vy = (c1.vy - p * ny * c2.mass) / damping
-    c2.vx = (c2.vx + p * nx * c1.mass) / damping
-    c2.vy = (c2.vy + p * ny * c1.mass) / damping
+    c1.vx = (c1vx - p * nx * c2mass) / damping
+    c1.vy = (c1vy - p * ny * c2mass) / damping
+    c2.vx = (c2vx + p * nx * c1mass) / damping
+    c2.vy = (c2vy + p * ny * c1mass) / damping
 
-    -- These are overwritten if the last position method is used.
-    c1.x = c1.x + c1.vx
-    c1.y = c1.y + c1.vy
-    c2.x = c2.x + c2.vx
-    c2.y = c2.y + c2.vy
+	-- Position values are overwritten for particles by resetting them to their old positions.
+    c1.x = c1x + c1vx
+    c1.y = c1y + c1vy
+    c2.x = c2x + c2vx
+    c2.y = c2y + c2vy
 
     return collisionPointX, collisionPointY
 end
@@ -629,6 +661,9 @@ function fluidsystem.screenResolution(c, f, x, y, w, h)
 	local cw = c.collider.w or c.collider.r * 2 or 16
 	local ch = c.collider.h or c.collider.r * 2 or 16
 
+	local cvx = c.vx or 0
+	local cvy = c.vy or 0
+
 	local sx = x or 0
 	local sy = y or 0
 	local sw = w or love.graphics.getWidth() or 0
@@ -636,22 +671,22 @@ function fluidsystem.screenResolution(c, f, x, y, w, h)
 
 	if (c.x + offsetx) + cw - radiusOffset > sx + sw then
 		c.x = sx + sw - cw - offsetx + radiusOffset
-		c.vx = -(c.vx / 2)
+		c.vx = -(cvx / 2)
 
 	elseif (c.x + offsetx) - radiusOffset < sx + offsetx then
 		c.x = sx + offsetx + radiusOffset
-		c.vx = -(c.vx / 2)
+		c.vx = -(cvx / 2)
 	end
 
 	if (c.y + offsety) + ch - radiusOffset > sy + sh then
 		c.y = sy + sh - ch - offsety + radiusOffset
-		c.vy = -(c.vy / 2)
+		c.vy = -(cvy / 2)
 
 		-- We are colliding from the top. Add friction.
-		c.vx = c.vx * frictionForce
+		c.vx = cvx * frictionForce
 
 	elseif (c.y + offsety) - radiusOffset < sy + offsety then
 		c.y = sy + offsety + radiusOffset
-		c.vy = -(c.vy / 2)
+		c.vy = -(cvy / 2)
 	end
 end	
