@@ -41,13 +41,14 @@ function fluidsystem.new(params)
 	system.w = params.w or love.graphics.getWidth()
 	system.h = params.h or love.graphics.getHeight()
 
-	system.color = params.color or {255, 255, 255, 255} -- Colors are in RGB. These are converted for GLSL in the generateFluidshader function.
-
+	system.color = params.c or params.color or {255, 255, 255, 255} -- Colors are in RGB. These are converted for GLSL in the generateFluidshader function.
 	system.gravity = params.g or params.gravity or 0.0981 -- This value defaults to 0.0981 since the system is intended for sidescrolling games. A value of zero might be useful for top down based games.
-	system.mass = params.m or params.gravity or 1 -- Global mass of particles in this system.
+	system.mass = params.m or params.mass or 1 -- Global mass of particles in this system.
 	system.damping = params.damping or params.airdamping or 1.000 -- How much particles lose velocity when not colliding. Velocity is divided by this number.
 	system.collisionDamping = params.collisiondamping or 1.1 -- How much velocity is divided by when a collision occurs. Useful for particle clumping.
 	system.particleFriction = params.friction or params.particlefriction or 1.0 -- How much x-velocity is lost when colliding with the top of flat surfaces. Values are multiplied.
+	system.radius = params.r or params.radius or 8 -- Global size of particles
+	system.fluidmargin = params.fm or params.fluidmargin or params.margin or 2 -- Distance at which particles are connected with the shader.
 
 	system.quadtree = {} -- Table containing the partitioned quadtrees
 	system.quads = {}
@@ -85,8 +86,8 @@ function fluidsystem.new(params)
 		particle.lasty = particle.y
 
 		-- Color, radius, mass and collider
-		particle.color = color or {255, 255, 255, 255} -- Colors: {RED, GREEN, BLUE, ALPHA/OPACITY}
-		particle.r = r or 8
+		particle.color = color or self.color or {255, 255, 255, 255} -- Colors: {RED, GREEN, BLUE, ALPHA/OPACITY}
+		particle.r = r or self.radius or 8
 		particle.mass = mass or self.mass
 		particle.collider = fluidsystem.createCircleCollider(particle.r)
 
@@ -251,19 +252,20 @@ function fluidsystem.new(params)
 			self.fluideffect = love.graphics.newShader(([[
 				#define NPARTICLES %d
 				extern vec2[NPARTICLES] particles;
-				extern vec3 extColor;
+				extern vec3 color;
 				extern float radius;
+				extern float margin;
 
 				float metaball(vec2 x){
-					x /= radius * 1.5;
+					x /= radius * margin;
 					return 1.0 / (dot(x, x));
 				}
 
-				vec4 effect(vec4 color, Image tex, vec2 tc, vec2 pc){
+				vec4 effect(vec4 c, Image tex, vec2 tc, vec2 pc){
 					float p = 0.0;
 					for (int i = 0; i < NPARTICLES; ++i) p += metaball(pc - particles[i]);
 					p = floor(p);
-					return vec4(extColor.x, extColor.y, extColor.z, p);
+					return vec4(color.x, color.y, color.z, p);
 				}
 			]]):format(#self.particles))
 
@@ -271,8 +273,9 @@ function fluidsystem.new(params)
 			local vectorTable = self:constructVectorTable(self.particles)
 
 			self.fluideffect:send("particles", unpack(vectorTable))
-			self.fluideffect:send("radius", self.particles[1].r)
-			self.fluideffect:send("extColor", {self.color[1] / 255, self.color[2] / 255, self.color[3] / 255})
+			self.fluideffect:send("color", {self.color[1] / 255, self.color[2] / 255, self.color[3] / 255})
+			self.fluideffect:send("radius", self.radius)
+			self.fluideffect:send("margin", self.fluidmargin)
 		end
 	end
 
@@ -292,7 +295,7 @@ function fluidsystem.new(params)
 
 		for i, particle in pairs(self.particles) do
 			-- Make sure the particle does not leave the fluidsystem
-			fluidsystem.screenResolution(particle, self.particleFriction, self.x, self.y, self.w, self.h)
+			fluidsystem.confineResolution(particle, self.particleFriction, self.x, self.y, self.w, self.h)
 
 			-- Add the system's gravity to the particles velocity
 			particle.vy = particle.vy + self.gravity
@@ -339,19 +342,21 @@ function fluidsystem.new(params)
 	-- Method to draw the current state of the fluid simulation
 	function system:draw()
 		if self.fluideffect and self.drawshader == true then
-			love.graphics.setColor(255,255,255,255)
+			love.graphics.setColor(255, 255, 255, 255)
 			love.graphics.setShader(self.fluideffect)
 			love.graphics.rectangle('fill', 0,0, love.graphics.getWidth(), love.graphics.getHeight())
 		else
 			for i, particle in pairs(self.particles) do
 				love.graphics.setColor(self.color)
 				love.graphics.circle("fill", particle.x, particle.y, particle.r)
-				--love.graphics.rectangle("line", particle.x - particle.r + particle.collider.ox, particle.y - particle.r + particle.collider.oy, particle.r * 2, particle.r * 2)
+				-- love.graphics.rectangle("line", particle.x - particle.r + particle.collider.ox, particle.y - particle.r + particle.collider.oy, particle.r * 2, particle.r * 2)
 			end
 		end
 
 		-- Reset the shader so it does not influence other systems and draw calls.
 		love.graphics.setShader()
+
+		love.graphics.setColor(255, 255, 255, 255)
 
 		-- Draw quads if it is desired.
 		if self.drawquads == true then
@@ -490,10 +495,14 @@ end
 
 -- Circle collision without the use of math.sqrt
 function fluidsystem.circleCollision(c1, c2)
+	local c1x = c1.x or c1.position.x or 0
+	local c1y = c1.y or c1.position.y or 0
+	local c2x = c2.x or c2.position.x or 0
+	local c2y = c2.y or c2.position.y or 0
 	local c1r = c1.collider.w or c1.collider.r or 8
 	local c2r = c2.collider.w or c2.collider.r or 8
 
-	local dist = (c2.x - c1.x)^2 + (c2.y - c1.y)^2
+	local dist = (c2x - c1x)^2 + (c2y - c1y)^2
 
 	-- Returns true if a circle collision was detected
 	return (dist + (c2r^2 - c1r^2)) < (c1r*2)^2
@@ -651,8 +660,8 @@ function fluidsystem.pixelResolution(c1, c2)
 
 end
 
--- Screen collision resolution is based on box collision.
-function fluidsystem.screenResolution(c, f, x, y, w, h)
+-- Keeps a collider inside a specified area
+function fluidsystem.confineResolution(c, f, x, y, w, h)
 	-- Offset calculation. Often used if the origins need to be repositioned.
 	-- Circles automatically receive offset calculations since their origins are at their center.
 	local offsetx = c.collider.ox or 0
