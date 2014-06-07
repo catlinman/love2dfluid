@@ -41,33 +41,37 @@ function fluidsystem.new(params)
 	system.w = params.w or love.graphics.getWidth()
 	system.h = params.h or love.graphics.getHeight()
 
-	system.color = params.c or params.color or {255, 255, 255, 255} -- Colors are in RGB. These are converted for GLSL in the generateFluidshader function.
+	system.color = params.c or params.color or {125, 195, 255, 255} -- Colors are in RGB. These are converted for GLSL in the generateFluidshader function.
 	system.gravity = params.g or params.gravity or 0.0981 -- This value defaults to 0.0981 since the system is intended for sidescrolling games. A value of zero might be useful for top down based games.
 	system.mass = params.m or params.mass or 1 -- Global mass of particles in this system.
 	system.damping = params.damping or params.airdamping or 1.000 -- How much particles lose velocity when not colliding. Velocity is divided by this number.
 	system.collisionDamping = params.collisiondamping or 1.1 -- How much velocity is divided by when a collision occurs. Useful for particle clumping.
 	system.particleFriction = params.friction or params.particlefriction or 1.0 -- How much x-velocity is lost when colliding with the top of flat surfaces. Values are multiplied.
 	system.radius = params.r or params.radius or 8 -- Global size of particles
-	system.fluidmargin = params.fm or params.fluidmargin or params.margin or 2 -- Distance at which particles are connected with the shader.
+	--system.fluidmargin = params.fm or params.fluidmargin or params.margin or 1 -- Distance margin between particle connections through the shader.
 
 	system.quadtree = {} -- Table containing the partitioned quadtrees
 	system.quads = {}
-	system.quadtreeMaxObjects = params.maxquadobjects or 48 -- The amount of objects needed in a cell before it splits. 48 seems to be the sweet spot
+	system.quadtreeMaxObjects = params.maxquadobjects or 64 -- The amount of objects needed in a cell before it splits. 48 seems to be the sweet spot
 	system.quadtreeMaxRecursion = params.maxquadrecursion or 5 
 	system.quadtreeIndex = 1
 
 	system.drawshader = params.drawshader or true
 	system.drawquads = params.drawquads or true
+	system.drawaffectors = params.drawaffectors or true
 
 	-- Assign the current system id and increment it
 	system.id = id
 	id = id + 1
 
-	system.particles = {} -- Table containing the fluid particles
-	system.particleId = 1 -- Each particle is given an id to track it in the particle table. This value increments as more particles are created.
+	system.particles = {} -- Table containing the fluid particles.
+	system.particleid = 1 -- Each particle is given an id to track it in the particle table. This value increments as more particles are created.
 
-	system.colliders = {} -- Table containing a set of objects that particles can collide with
-	system.affectors = {} -- Table containing objects that affect the flow of particles
+	system.colliders = {} -- Table containing a set of objects that particles can collide with.
+	system.colliderid = 1 -- Indexing for colliders.
+
+	system.affectors = {} -- Table containing objects that affect the flow of particles.
+	system.affectorid = 1 -- Indexing for affectors.
 
 	-- Add and remove particles using the following two methods.
 	function system:addParticle(x, y, vx, vy, color, r, mass)
@@ -92,8 +96,8 @@ function fluidsystem.new(params)
 		particle.collider = fluidsystem.createCircleCollider(particle.r)
 
 		-- Id assignment
-		particle.id = self.particleId
-		self.particleId = self.particleId + 1
+		particle.id = self.particleid
+		self.particleid = self.particleid + 1
 
 		-- Add the particle to this system's particle table
 		self.particles[particle.id] = particle
@@ -128,7 +132,7 @@ function fluidsystem.new(params)
 		end
 
 		-- Reset the particle index to one.
-		self.particleId = 1
+		self.particleid = 1
 
 		-- The quadtree has to be rebuilt. The same must be done with the shader if needed.
 		self:generateQuadtree()
@@ -143,15 +147,55 @@ function fluidsystem.new(params)
 	end
 
 	-- Apply an impulse at the given coordinates using the following method.
-	function system:applyImpulse(x, y, force)
+	function system:applyImpulse(x, y, force, radius)
 		for i, particle in pairs(self.particles) do
 			local dx, dy = particle.x - x, particle.y - y
 			local lenght = math.sqrt((dx * dx) + (dy * dy)) 
 			local dist = math.sqrt((x - particle.x)^2 + (y - particle.y)^2)
-			local x2, y2 = dx / lenght, dy / lenght
-			particle.vx = particle.vx + x2 * force / dist
-			particle.vy = particle.vy + y2 * force / dist
+			local radius = radius or math.huge
+			
+			if dist < radius then
+				local x2, y2 = dx / lenght, dy / lenght
+				particle.vx = particle.vx + x2 * force / dist
+				particle.vy = particle.vy + y2 * force / dist
+			end
 		end
+	end
+
+	-- Affector object creation.
+	function system:addAffector(x, y, force, radius)
+		local affector = {}
+		affector.x = x or 0
+		affector.y = y or 0
+		affector.force = force or 1
+		affector.radius = radius or math.huge
+		affector.id = self.affectorid
+
+		self.affectors[self.affectorid] = affector
+
+		self.affectorid = self.affectorid + 1
+
+		return self.affectors[self.affectorid]
+	end
+
+	function system:removeAffector(id)
+		-- Check if the affector exists
+		if self.affectors[id] then
+			self.affectors[id] = nil -- Destroy the reference
+		end
+	end
+
+	function system:removeAllAffectors()
+		for i, affector in pairs(self.affectors) do
+			self.affectors[affector.id] = nil
+		end
+
+		-- Reset the affector index to one.
+		self.affectorid = 1
+	end
+
+	function system:returnAffectorCount()
+		return #self.affectors
 	end
 
 	-- Generates a new quad used by the quadtree
@@ -249,33 +293,35 @@ function fluidsystem.new(params)
 	-- Needs to be done when a new particle is added or removed
 	function system:generateFluidshader()
 		if self.particles then
-			self.fluideffect = love.graphics.newShader(([[
-				#define NPARTICLES %d
-				extern vec2[NPARTICLES] particles;
-				extern vec3 color;
-				extern float radius;
-				extern float margin;
+			if #self.particles < 400 then
+				self.fluideffect = love.graphics.newShader(([[
+					#define NPARTICLES %d
+					extern vec2[NPARTICLES] particles;
+					extern vec4 color;
+					extern float radius;
 
-				float metaball(vec2 x){
-					x /= radius * margin;
-					return 1.0 / (dot(x, x));
-				}
+					float metaball(vec2 x){
+						x /= radius * 2;
+						return 1.0 / (dot(x, x));
+					}
 
-				vec4 effect(vec4 c, Image tex, vec2 tc, vec2 pc){
-					float p = 0.0;
-					for (int i = 0; i < NPARTICLES; ++i) p += metaball(pc - particles[i]);
-					p = floor(p);
-					return vec4(color.x, color.y, color.z, p);
-				}
-			]]):format(#self.particles))
+					vec4 effect(vec4 c, Image tex, vec2 tc, vec2 pc){
+						float p = 0.0;
+						for (int i = 0; i < NPARTICLES; ++i) p += metaball(pc - particles[i]);
+						p = floor(p);
+						return vec4(color.r, color.g, color.b, p);
+					}
+				]]):format(#self.particles))
 
-			-- Convert the particles to a plain vector table.
-			local vectorTable = self:constructVectorTable(self.particles)
+				-- Convert the particles to a plain vector table.
+				local vectorTable = self:constructVectorTable(self.particles)
 
-			self.fluideffect:send("particles", unpack(vectorTable))
-			self.fluideffect:send("color", {self.color[1] / 255, self.color[2] / 255, self.color[3] / 255})
-			self.fluideffect:send("radius", self.radius)
-			self.fluideffect:send("margin", self.fluidmargin)
+				self.fluideffect:send("particles", unpack(vectorTable))
+				self.fluideffect:send("color", {self.color[1] / 255, self.color[2] / 255, self.color[3] / 255, self.color[4] / 255})
+				self.fluideffect:send("radius", self.radius)
+			else
+				self.fluideffect = nil
+			end
 		end
 	end
 
@@ -292,6 +338,10 @@ function fluidsystem.new(params)
 	function system:simulate(dt)
 		self:generateQuadtree()
 		self:updateFluidshader()
+
+		for i, affector in pairs(self.affectors) do
+			self:applyImpulse(affector.x, affector.y, affector.force, affector.radius)
+		end
 
 		for i, particle in pairs(self.particles) do
 			-- Make sure the particle does not leave the fluidsystem
@@ -363,6 +413,19 @@ function fluidsystem.new(params)
 			if self.quads then
 				for i, quad in pairs(self.quads) do
 					love.graphics.rectangle("line", quad.x, quad.y, quad.w, quad.h)	
+				end
+			end
+		end
+
+		-- Draw affectors if it is desired.
+		if self.drawaffectors == true then
+			if self.affectors then
+				for i, affector in pairs(self.affectors) do
+					if affector.radius > ((love.graphics.getWidth() + love.graphics.getHeight()) / 2) then
+						love.graphics.circle("line", affector.x, affector.y, 128)
+					else
+						love.graphics.circle("line", affector.x, affector.y, affector.radius)
+					end
 				end
 			end
 		end
