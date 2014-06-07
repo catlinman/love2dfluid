@@ -13,7 +13,7 @@
 	-> https://github.com/Catlinman/LOVE2D-FluidSystem/blob/master/LICENSE.md
 	
 	I have attempted to comment most of the code to allow those not familiar with LOVE to jump faster into modifying the code.
-	To remove all comments simply use a program like Sublime Text 2 and replace everything with whitespace using the following regex lines:
+	To remove all comments simply use a program like Sublime Text 2 and replace everything with whitespace using the following regex line:
 
 	--"[^\[\]"]*?$
 
@@ -40,6 +40,8 @@ function fluidsystem.new(params)
 	system.y = params.y or 0
 	system.w = params.w or love.graphics.getWidth()
 	system.h = params.h or love.graphics.getHeight()
+
+	system.color = params.color or {255, 255, 255, 255} -- Colors are in RGB. These are converted for GLSL in the generateFluidshader function.
 
 	system.gravity = params.g or params.gravity or 0.0981 -- This value defaults to 0.0981 since the system is intended for sidescrolling games. A value of zero might be useful for top down based games.
 	system.mass = params.m or params.gravity or 1 -- Global mass of particles in this system.
@@ -249,18 +251,19 @@ function fluidsystem.new(params)
 			self.fluideffect = love.graphics.newShader(([[
 				#define NPARTICLES %d
 				extern vec2[NPARTICLES] particles;
+				extern vec3 extColor;
 				extern float radius;
 
 				float metaball(vec2 x){
-					x /= radius;
-					return 1.0 / (dot(x, x) + .000001);
+					x /= radius * 1.5;
+					return 1.0 / (dot(x, x));
 				}
 
 				vec4 effect(vec4 color, Image tex, vec2 tc, vec2 pc){
 					float p = 0.0;
 					for (int i = 0; i < NPARTICLES; ++i) p += metaball(pc - particles[i]);
-					p = (ceil(p) / 2.0);
-					return vec4(p);
+					p = floor(p);
+					return vec4(extColor.x, extColor.y, extColor.z, p);
 				}
 			]]):format(#self.particles))
 
@@ -269,6 +272,7 @@ function fluidsystem.new(params)
 
 			self.fluideffect:send("particles", unpack(vectorTable))
 			self.fluideffect:send("radius", self.particles[1].r)
+			self.fluideffect:send("extColor", {self.color[1] / 255, self.color[2] / 255, self.color[3] / 255})
 		end
 	end
 
@@ -335,12 +339,12 @@ function fluidsystem.new(params)
 	-- Method to draw the current state of the fluid simulation
 	function system:draw()
 		if self.fluideffect and self.drawshader == true then
-			love.graphics.setColor(0,0,0,255)
+			love.graphics.setColor(255,255,255,255)
 			love.graphics.setShader(self.fluideffect)
 			love.graphics.rectangle('fill', 0,0, love.graphics.getWidth(), love.graphics.getHeight())
 		else
 			for i, particle in pairs(self.particles) do
-				love.graphics.setColor(particle.color)
+				love.graphics.setColor(self.color)
 				love.graphics.circle("fill", particle.x, particle.y, particle.r)
 				--love.graphics.rectangle("line", particle.x - particle.r + particle.collider.ox, particle.y - particle.r + particle.collider.oy, particle.r * 2, particle.r * 2)
 			end
