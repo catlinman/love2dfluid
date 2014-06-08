@@ -93,7 +93,7 @@ function fluidsystem.new(params)
 		particle.color = color or self.color or {255, 255, 255, 255} -- Colors: {RED, GREEN, BLUE, ALPHA/OPACITY}
 		particle.r = r or self.radius or 8
 		particle.mass = mass or self.mass
-		particle.collider = fluidsystem.createCircleCollider(particle.r)
+		particle.fluidcollider = fluidsystem.createCircleCollider(particle.r)
 
 		-- Id assignment
 		particle.id = self.particleid
@@ -206,7 +206,7 @@ function fluidsystem.new(params)
 		quad.valid = true
 		quad.level = l
 		quad.parent = p
-		quad.collider = fluidsystem.createBoxCollider(quad.w, quad.h)
+		quad.fluidcollider = fluidsystem.createBoxCollider(quad.w, quad.h)
 		quad.id = self.quadtreeIndex
 
 		self.quads[self.quadtreeIndex] = quad
@@ -230,7 +230,7 @@ function fluidsystem.new(params)
 			for j, particle in pairs(quad.particles) do
 				if fluidsystem.boxCollision(childQuad, particle) then
 					childQuad.particles[particle.id] = particle
-					particle.collider.quads[childQuad.id] = childQuad
+					particle.fluidcollider.quads[childQuad.id] = childQuad
 					containing = containing + 1
 				end
 			end
@@ -257,14 +257,14 @@ function fluidsystem.new(params)
 
 		if #self.particles > self.quadtreeMaxObjects then
 			for i, particle in pairs(self.particles) do
-				particle.collider.quads = {}
+				particle.fluidcollider.quads = {}
 			end
 
 			self:splitQuad(self.quadtree)
 		else
 			for i, particle in pairs(self.particles) do
 				self.quadtree.particles[particle.id] = particle
-				particle.collider.quads[self.quadtree.id] = self.quadtree
+				particle.fluidcollider.quads[self.quadtree.id] = self.quadtree
 			end
 		end
 	end
@@ -274,7 +274,7 @@ function fluidsystem.new(params)
 		for i, quad in pairs(self.quads) do
 			if quad.valid then
 				if fluidsystem.boxCollision(quad, c) then
-					c.collider.quads[quad.id] = quad
+					c.fluidcollider.quads[quad.id] = quad
 				end
 			end
 		end
@@ -364,7 +364,7 @@ function fluidsystem.new(params)
 			self:updateQuadtreeCollider(particle)
 
 			-- Perform collision detection and resolution here
-			for j, quad in pairs(particle.collider.quads) do
+			for j, quad in pairs(particle.fluidcollider.quads) do
 				for k, particle2 in pairs(quad.particles) do
 					-- Make sure we are not checking against an already checked particle
 					if particle2 ~= particle then
@@ -399,7 +399,7 @@ function fluidsystem.new(params)
 			for i, particle in pairs(self.particles) do
 				love.graphics.setColor(self.color)
 				love.graphics.circle("fill", particle.x, particle.y, particle.r)
-				-- love.graphics.rectangle("line", particle.x - particle.r + particle.collider.ox, particle.y - particle.r + particle.collider.oy, particle.r * 2, particle.r * 2)
+				-- love.graphics.rectangle("line", particle.x - particle.r + particle.fluidcollider.ox, particle.y - particle.r + particle.fluidcollider.oy, particle.r * 2, particle.r * 2)
 			end
 		end
 
@@ -539,12 +539,12 @@ function fluidsystem.boxCollision(c1, c2)
 	local c1y = c1.y or c1.position.y or 0
 	local c2x = c2.x or c2.position.x or 0
 	local c2y = c2.y or c2.position.y or 0
-	local c1w = c1.collider.w or c1.collider.r * 2 or 16
-	local c1h = c1.collider.h or c1.collider.r * 2 or 16
-	local c2w = c2.collider.w or c2.collider.r * 2 or 16
-	local c2h = c2.collider.h or c2.collider.r * 2 or 16
-	local r1offset = c1.collider.r or 0
-	local r2offset = c2.collider.r or 0
+	local c1w = c1.fluidcollider.w or c1.fluidcollider.r * 2 or 16
+	local c1h = c1.fluidcollider.h or c1.fluidcollider.r * 2 or 16
+	local c2w = c2.fluidcollider.w or c2.fluidcollider.r * 2 or 16
+	local c2h = c2.fluidcollider.h or c2.fluidcollider.r * 2 or 16
+	local r1offset = c1.fluidcollider.r or 0
+	local r2offset = c2.fluidcollider.r or 0
 
 	local c1x2, c1y2, c2x2, c2y2 = c1.x + c1w, c1.y + c1h, c2.x + c2w, c2.y + c2h
 
@@ -562,8 +562,8 @@ function fluidsystem.circleCollision(c1, c2)
 	local c1y = c1.y or c1.position.y or 0
 	local c2x = c2.x or c2.position.x or 0
 	local c2y = c2.y or c2.position.y or 0
-	local c1r = c1.collider.w or c1.collider.r or 8
-	local c2r = c2.collider.w or c2.collider.r or 8
+	local c1r = c1.fluidcollider.w or c1.fluidcollider.r or 8
+	local c2r = c2.fluidcollider.w or c2.fluidcollider.r or 8
 
 	local dist = (c2x - c1x)^2 + (c2y - c1y)^2
 
@@ -585,18 +585,18 @@ function fluidsystem.boxResolution(c1, c2, f, d)
 	local c1y = c1.y or c1.position.y or 0
 	local c2x = c2.x or c2.position.x or 0
 	local c2y = c2.y or c2.position.y or 0
-	local c1w = c1.collider.w or c1.collider.r * 2 or 16
-	local c1h = c1.collider.h or c1.collider.r * 2 or 16
-	local c2w = c2.collider.w or c2.collider.r * 2 or 16
-	local c2h = c2.collider.h or c2.collider.r * 2 or 16
+	local c1w = c1.fluidcollider.w or c1.fluidcollider.r * 2 or 16
+	local c1h = c1.fluidcollider.h or c1.fluidcollider.r * 2 or 16
+	local c2w = c2.fluidcollider.w or c2.fluidcollider.r * 2 or 16
+	local c2h = c2.fluidcollider.h or c2.fluidcollider.r * 2 or 16
 	local c1vx = c1.vx or 0
 	local c1vy = c1.vy or 0
 	local c2vx = c2.vx or 0
 	local c2vy = c2.vy or 0
 	local c1mass = c1.mass or 1
 	local c2mass = c2.mass or 1
-	local c1radiusOffset = c1.collider.r or 0
-	local c2radiusOffset = c2.collider.r or 0
+	local c1radiusOffset = c1.fluidcollider.r or 0
+	local c2radiusOffset = c2.fluidcollider.r or 0
 
 	local jointMass = c1mass + c2mass
 	local differenceMass = c1mass - c2mass
@@ -643,16 +643,16 @@ function fluidsystem.innerBoxResolution(c1, c2, f)
 	local c1y = c1.y or c1.position.y or 0
 	local c2x = c2.x or c2.position.x or 0
 	local c2y = c2.y or c2.position.y or 0
-	local c1w = c1.collider.w or c1.collider.r * 2 or 16
-	local c1h = c1.collider.h or c1.collider.r * 2 or 16
-	local c2w = c2.collider.w or c2.collider.r * 2 or 16
-	local c2h = c2.collider.h or c2.collider.r * 2 or 16
+	local c1w = c1.fluidcollider.w or c1.fluidcollider.r * 2 or 16
+	local c1h = c1.fluidcollider.h or c1.fluidcollider.r * 2 or 16
+	local c2w = c2.fluidcollider.w or c2.fluidcollider.r * 2 or 16
+	local c2h = c2.fluidcollider.h or c2.fluidcollider.r * 2 or 16
 	local c1vx = c1.vx or 0
 	local c1vy = c1.vy or 0
 	local c2vx = c2.vx or 0
 	local c2vy = c2.vy or 0
-	local c1radiusOffset = c1.collider.r or 0
-	local c2radiusOffset = c2.collider.r or 0
+	local c1radiusOffset = c1.fluidcollider.r or 0
+	local c2radiusOffset = c2.fluidcollider.r or 0
 
 	-- Position values are overwritten for particles by resetting them to their old positions.
 	if c1x + c1w - c1radiusOffset > c2x + c2w then
@@ -690,8 +690,8 @@ function fluidsystem.circleResolution(c1, c2, d)
 	local c1vy = c1.vy or 0
 	local c2vx = c2.vx or 0
 	local c2vy = c2.vy or 0
-	local c1r = c1.collider.w or c1.collider.r or 8
-	local c2r = c2.collider.w or c2.collider.r or 8
+	local c1r = c1.fluidcollider.w or c1.fluidcollider.r or 8
+	local c2r = c2.fluidcollider.w or c2.fluidcollider.r or 8
 	local c1mass = c1.mass or 1
 	local c2mass = c2.mass or 1
 
@@ -727,15 +727,15 @@ end
 function fluidsystem.confineResolution(c, f, x, y, w, h)
 	-- Offset calculation. Often used if the origins need to be repositioned.
 	-- Circles automatically receive offset calculations since their origins are at their center.
-	local offsetx = c.collider.ox or 0
-	local offsety = c.collider.oy or 0
+	local offsetx = c.fluidcollider.ox or 0
+	local offsety = c.fluidcollider.oy or 0
 
-	local radiusOffset = c.collider.r or 0
+	local radiusOffset = c.fluidcollider.r or 0
 
 	local frictionForce = f or 1
 
-	local cw = c.collider.w or c.collider.r * 2 or 16
-	local ch = c.collider.h or c.collider.r * 2 or 16
+	local cw = c.fluidcollider.w or c.fluidcollider.r * 2 or 16
+	local ch = c.fluidcollider.h or c.fluidcollider.r * 2 or 16
 
 	local cvx = c.vx or 0
 	local cvy = c.vy or 0
