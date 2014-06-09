@@ -93,7 +93,7 @@ function fluidsystem.new(params)
 		particle.color = color or self.color or {255, 255, 255, 255} -- Colors: {RED, GREEN, BLUE, ALPHA/OPACITY}
 		particle.r = r or self.radius or 8
 		particle.mass = mass or self.mass
-		particle.fluidcollider = fluidsystem.createCircleCollider(particle.r)
+		particle.fluidcollider = fluidsystem.assignCircleCollider(particle, particle.r)
 
 		-- Id assignment
 		particle.id = self.particleid
@@ -198,6 +198,38 @@ function fluidsystem.new(params)
 		return #self.affectors
 	end
 
+	-- Collider object insertion. Colliders have to be created beforehand.
+	function system:addCollider(c)
+		-- Fluid colliders have a set of id's depending on the systems they belong to.
+		c.ids[self.id] = self.colliderid
+
+		self.colliders[self.colliderid] = c
+
+		self.colliderid = self.colliderid + 1
+
+		return self.colliders[self.colliderid]
+	end
+
+	function system:removeCollider(c)
+		-- Check if the collider exists
+		if self.colliders[c.ids[self.id]] then
+			self.colliders[c.ids[self.id]] = nil -- Destroy the reference
+		end
+	end
+
+	function system:removeAllColliders()
+		for i, collider in pairs(self.colliders) do
+			self.colliders[collider.ids[self.id]] = nil
+		end
+
+		-- Reset the collider index to one.
+		self.colliderid = 1
+	end
+
+	function system:returnColliderCount()
+		return #self.colliders
+	end
+
 	-- Generates a new quad used by the quadtree
 	function system:newQuad(x, y, w, h, l, p)
 		local quad = {}
@@ -206,7 +238,7 @@ function fluidsystem.new(params)
 		quad.valid = true
 		quad.level = l
 		quad.parent = p
-		quad.fluidcollider = fluidsystem.createBoxCollider(quad.w, quad.h)
+		quad.fluidcollider = fluidsystem.assignBoxCollider(quad, quad.w, quad.h)
 		quad.id = self.quadtreeIndex
 
 		self.quads[self.quadtreeIndex] = quad
@@ -496,39 +528,54 @@ end
 --]]
 
 -- Creates a new box collider. The Arguments ox and oy are the base offset from the parent object's position values.
-function fluidsystem.createBoxCollider(w, h, ox, oy)
-	local collider = {}
+function fluidsystem.assignBoxCollider(object, w, h, ox, oy)
+	if object then
+		local collider = {}
 
-	collider.collisionType = "box"
-	collider.w = w or 16
-	collider.h = h or 16
-	collider.ox, collider.oy = ox or 0, oy or 0
-	collider.quads = {}
+		collider.collisionType = "box"
+		collider.w = w or 16
+		collider.h = h or 16
+		collider.ox, collider.oy = ox or 0, oy or 0
+		collider.quads = {}
+		collider.ids = {}
 
-	return collider
+		object.fluidcollider = collider
+
+		return object.fluidcollider
+	end
 end
 
 -- Creates a new circle collider. The Arguments ox and oy are the base offset from the parent object's position values.
-function fluidsystem.createCircleCollider(r, ox, oy)
-	local collider = {}
+function fluidsystem.assignCircleCollider(object, r, ox, oy)
+	if object then
+		local collider = {}
 
-	collider.collisionType = "circle"
-	collider.r = r or 8
-	collider.ox, collider.oy = ox or 0, oy or 0
-	collider.quads = {}
+		collider.collisionType = "circle"
+		collider.r = r or 8
+		collider.ox, collider.oy = ox or 0, oy or 0
+		collider.quads = {}
+		collider.ids = {}
 
-	return collider
+		object.fluidcollider = collider
+
+		return object.fluidcollider
+	end
 end
 
 -- Image collider takes in an image to calculate pixel perfect collision. The Arguments ox and oy are the base offset from the parent object's position values.
-function fluidsystem.createPixelCollider(sx, sy, imagedata, ox, oy)
-	local collider = {}
+function fluidsystem.assignPixelCollider(object, sx, sy, imagedata, ox, oy)
+	if object then
+		local collider = {}
 
-	collider.collisionType = "pixel"
-	collider.ox, collider.oy = ox or 0, oy or 0
-	collider.quads = {}
+		collider.collisionType = "pixel"
+		collider.ox, collider.oy = ox or 0, oy or 0
+		collider.quads = {}
+		collider.ids = {}
 
-	return collider
+		object.fluidcollider = collider
+
+		return object.fluidcollider
+	end
 end
 
 -- COLLISION DETECTION FUNCTIONS
