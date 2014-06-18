@@ -32,22 +32,22 @@ local id = 1 -- Fluid system reference identification
 fluidsystem = {} -- Global variable containing the functions used to create and modify the fluid system
 
 -- Calling this function instantiates a new fluid system. The Arugment is a table containing all the information needed for the particlesystem.
-function fluidsystem.new(params)
+function fluidsystem.new(parameters)
 	local system = {}
-	local params = params or {} -- Make sure we don't cause null reference errors if there were no paramaters supplied.
+	local params = parameters or {} -- Make sure we don't cause null reference errors if there were no paramaters supplied.
 
 	system.x = params.x or 0
 	system.y = params.y or 0
 	system.w = params.w or love.graphics.getWidth()
 	system.h = params.h or love.graphics.getHeight()
 
-	system.color = params.c or params.color or {125, 195, 255, 255} -- Colors are in RGB. These are converted for GLSL in the generateFluidshader function.
+	system.color = params.c or params.color or {255, 255, 255, 255} -- Colors are in RGB. These are converted for GLSL in the generateFluidshader function.
 	system.gravity = params.g or params.gravity or 0.0981 -- This value defaults to 0.0981 since the system is intended for sidescrolling games. A value of zero might be useful for top down based games.
-	system.mass = params.m or params.mass or 1 -- Global mass of particles in this system.
-	system.damping = params.damping or params.airdamping or 1.000 -- How much particles lose velocity when not colliding. Velocity is divided by this number.
-	system.collisionDamping = params.collisiondamping or 1.1 -- How much velocity is divided by when a collision occurs. Useful for particle clumping.
-	system.particleFriction = params.friction or params.particlefriction or 1.0 -- How much x-velocity is lost when colliding with the top of flat surfaces. Values are multiplied.
-	system.radius = params.r or params.radius or 8 -- Global size of particles
+	system.mass = params.m or params.mass or 1.0 -- Global mass of particles in this system.
+	system.damping = params.d or params.damping or 1.0 -- How much particles lose velocity when not colliding. Velocity is divided by this number.
+	system.collisionDamping = params.cd or params.collisiondamping or 1.1 -- How much velocity is divided by when a collision occurs. Useful for particle clumping.
+	system.particleFriction = params.fr or params.friction or 1.0 -- How much x-velocity is lost when colliding with the top of flat surfaces. Values are multiplied.
+	system.radius = params.r or params.radius or 10.0 -- Global size of particles
 	--system.fluidmargin = params.fm or params.fluidmargin or params.margin or 1 -- Distance margin between particle connections through the shader.
 
 	system.quadtree = {} -- Table containing the partitioned quadtrees
@@ -57,8 +57,8 @@ function fluidsystem.new(params)
 	system.quadtreeIndex = 1
 
 	system.drawshader = params.drawshader or true
-	system.drawquads = params.drawquads or true
-	system.drawaffectors = params.drawaffectors or true
+	system.drawquads = params.drawquads or false
+	system.drawaffectors = params.drawaffectors or false
 
 	-- Assign the current system id and increment it
 	system.id = id
@@ -315,6 +315,7 @@ function fluidsystem.new(params)
 	-- Takes in a table and filters out the x and y variables into a new table. Screen coordinates are also changed to real coordiantes for use in shaders.
 	function system:constructVectorTable(table)
 		local t = {}
+
 		for k, v in pairs(table) do
 			t[k] = {v.x, love.graphics.getHeight() - v.y}
 		end
@@ -359,7 +360,7 @@ function fluidsystem.new(params)
 
 	-- Update the shader by giving it the new particle positions
 	function system:updateFluidshader()
-		if self.particles and self.fluideffect then
+		if self.particles[1] and self.fluideffect then
 			local vectorTable = self:constructVectorTable(self.particles)
 
 			self.fluideffect:send("particles", unpack(vectorTable))

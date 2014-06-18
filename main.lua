@@ -8,15 +8,8 @@ local timestep = 0.018
 local fluid = {}
 
 function love.load()
-	fluid = fluidsystem.new()
-	fluid:addAffector(0,0,50)
-	fluid:addAffector(1024,0,50)
-	fluid:addAffector(0,768,50)
-	fluid:addAffector(1024,768,50)
-	fluid:addAffector(1024 / 2,768 / 2, 256, 128)
-
-	local num = 256
-	local actual = math.ceil(math.sqrt(num))
+	parameters = {}
+	fluid = fluidsystem.new(parameters)
 
 	collectgarbage("setstepmul", 200)
 	collectgarbage("setpause", 105)
@@ -58,13 +51,13 @@ function love.mousepressed(x, y, button)
 	if button == "l" then
 		fluid:applyImpulse(x, y, 250)
 	elseif button == "r" then
-		fluid:addParticle(x, y, math.random(-1000,1000) / 100, math.random(-1000,1000) / 100, nil, 16)
+		fluid:addParticle(x, y, math.random(-1000,1000) / 100, math.random(-1000,1000) / 100)
 	end
 end
 
 function love.keypressed(keycode)
 	if keycode == "+" or keycode == "kp+" then
-		fluid:addParticle(math.random(32, love.graphics.getWidth() - 32), math.random(32, love.graphics.getHeight() - 200), 0, 0, nil, 16)
+		fluid:addParticle(math.random(32, love.graphics.getWidth() - 32), math.random(32, love.graphics.getHeight() - 200), 0, 0)
 	end
 
 	if keycode == "delete" then
