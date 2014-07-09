@@ -48,7 +48,7 @@ function fluidsystem.new(parameters)
 	system.collisionDamping = params.cd or params.collisiondamping or 1.1 -- How much velocity is divided by when a collision occurs. Useful for particle clumping.
 	system.particleFriction = params.fr or params.friction or 1.0 -- How much x-velocity is lost when colliding with the top of flat surfaces. Values are multiplied.
 	system.radius = params.r or params.radius or 10.0 -- Global size of particles
-	--system.fluidmargin = params.fm or params.fluidmargin or params.margin or 1 -- Distance margin between particle connections through the shader.
+	system.fluidmargin = params.fm or params.fluidmargin or params.margin or 1.25 -- Distance margin between particle connections through the shader.
 
 	system.quadtree = {} -- Table containing the partitioned quadtrees
 	system.quads = {}
@@ -92,7 +92,6 @@ function fluidsystem.new(parameters)
 		-- Color, radius, mass and collider
 		particle.color = color or self.color or {255, 255, 255, 255} -- Colors: {RED, GREEN, BLUE, ALPHA/OPACITY}
 		particle.r = r or self.radius or 8
-		particle.mass = mass or self.mass
 		particle.fluidcollider = fluidsystem.assignCircleCollider(particle, particle.r)
 
 		-- Id assignment
@@ -200,8 +199,8 @@ function fluidsystem.new(parameters)
 
 	-- Collider object insertion. Colliders have to be created beforehand.
 	function system:addCollider(c)
-		-- Fluid colliders have a set of id's depending on the systems they belong to.
-		c.ids[self.id] = self.colliderid
+		-- Fluid colliders have a set of ids depending on the systems they belong to.
+		c.fluidcollider.ids[self.id] = self.colliderid
 
 		self.colliders[self.colliderid] = c
 
@@ -212,14 +211,14 @@ function fluidsystem.new(parameters)
 
 	function system:removeCollider(c)
 		-- Check if the collider exists
-		if self.colliders[c.ids[self.id]] then
-			self.colliders[c.ids[self.id]] = nil -- Destroy the reference
+		if self.colliders[c.fluidcollider.ids[self.id]] then
+			self.colliders[c.fluidcollider.ids[self.id]] = nil -- Destroy the reference
 		end
 	end
 
 	function system:removeAllColliders()
-		for i, collider in pairs(self.colliders) do
-			self.colliders[collider.ids[self.id]] = nil
+		for i, c in pairs(self.colliders) do
+			self.colliders[c.fluidcollider.ids[self.id]] = nil
 		end
 
 		-- Reset the collider index to one.
@@ -331,10 +330,11 @@ function fluidsystem.new(parameters)
 					#define NPARTICLES %d
 					extern vec2[NPARTICLES] particles;
 					extern vec4 color;
+					extern float margin;
 					extern float radius;
 
 					float metaball(vec2 x){
-						x /= radius * 2;
+						x /= radius * margin;
 						return 1.0 / (dot(x, x));
 					}
 
@@ -352,6 +352,7 @@ function fluidsystem.new(parameters)
 				self.fluideffect:send("particles", unpack(vectorTable))
 				self.fluideffect:send("color", {self.color[1] / 255, self.color[2] / 255, self.color[3] / 255, self.color[4] / 255})
 				self.fluideffect:send("radius", self.radius)
+				self.fluideffect:send("margin", self.fluidmargin)
 			else
 				self.fluideffect = nil
 			end
@@ -395,6 +396,13 @@ function fluidsystem.new(parameters)
 			local collided = false
 
 			self:updateQuadtreeCollider(particle)
+
+			for i, colliderObject in pairs(self.colliders) do
+				if colliderObject.fluidcollider.collision(colliderObject, particle) then
+					colliderObject.fluidcollider.resolve(colliderObject, particle)
+					collided = true
+				end
+			end
 
 			-- Perform collision detection and resolution here
 			for j, quad in pairs(particle.fluidcollider.quads) do
@@ -529,13 +537,16 @@ end
 --]]
 
 -- Creates a new box collider. The Arguments ox and oy are the base offset from the parent object's position values.
-function fluidsystem.assignBoxCollider(object, w, h, ox, oy)
+function fluidsystem.assignBoxCollider(object, w, h, mass, static, ox, oy)
 	if object then
 		local collider = {}
 
-		collider.collisionType = "box"
+		collider.collision = fluidsystem.boxCollision
+		collider.resolve = fluidsystem.boxResolution
 		collider.w = w or 16
 		collider.h = h or 16
+		collider.mass = mass or 1
+		collider.static = static or false
 		collider.ox, collider.oy = ox or 0, oy or 0
 		collider.quads = {}
 		collider.ids = {}
@@ -547,12 +558,15 @@ function fluidsystem.assignBoxCollider(object, w, h, ox, oy)
 end
 
 -- Creates a new circle collider. The Arguments ox and oy are the base offset from the parent object's position values.
-function fluidsystem.assignCircleCollider(object, r, ox, oy)
+function fluidsystem.assignCircleCollider(object, r, mass, static, ox, oy)
 	if object then
 		local collider = {}
 
-		collider.collisionType = "circle"
+		collider.collision = fluidsystem.circleCollision
+		collider.resolve = fluidsystem.circleResolution
 		collider.r = r or 8
+		collider.mass = mass or 1
+		collider.static = static or false
 		collider.ox, collider.oy = ox or 0, oy or 0
 		collider.quads = {}
 		collider.ids = {}
@@ -564,11 +578,14 @@ function fluidsystem.assignCircleCollider(object, r, ox, oy)
 end
 
 -- Image collider takes in an image to calculate pixel perfect collision. The Arguments ox and oy are the base offset from the parent object's position values.
-function fluidsystem.assignPixelCollider(object, sx, sy, imagedata, ox, oy)
+function fluidsystem.assignPixelCollider(object, sx, sy, imagedata, mass, static, ox, oy)
 	if object then
 		local collider = {}
 
-		collider.collisionType = "pixel"
+		collider.collisionDetection = fluidsystem.boxCollision
+		collider.collisionResolution = fluidsystem.boxResolution
+		collider.mass = mass or 1
+		collider.static = static or false
 		collider.ox, collider.oy = ox or 0, oy or 0
 		collider.quads = {}
 		collider.ids = {}
@@ -641,8 +658,8 @@ function fluidsystem.boxResolution(c1, c2, f, d)
 	local c1vy = c1.vy or 0
 	local c2vx = c2.vx or 0
 	local c2vy = c2.vy or 0
-	local c1mass = c1.mass or 1
-	local c2mass = c2.mass or 1
+	local c1mass = c1.fluidcollider.mass or 1
+	local c2mass = c2.fluidcollider.mass or 1
 	local c1radiusOffset = c1.fluidcollider.r or 0
 	local c2radiusOffset = c2.fluidcollider.r or 0
 
@@ -659,7 +676,9 @@ function fluidsystem.boxResolution(c1, c2, f, d)
 	if c1x - c1vx + c1w > c2x and c1x - c1vx < c2x + c2w then
 		if c1y - c1vy + c1h < c2y and c1vy > 0 then
 			c1.y = c2y - c1h
-			c1.vx = c1vx * frictionForce
+			if c1.fluidcollider.static == false then
+				c1.vx = c1vx * frictionForce
+			end
 		elseif c1y - c1vy > c2y + c2h and c1vy < 0 then
 			c1.y = c2.y + c2h
 		end
@@ -671,16 +690,19 @@ function fluidsystem.boxResolution(c1, c2, f, d)
 		end
 	end
 
-	c1.vx = c1vxNew / damping
-	c1.vy = c1vyNew / damping
-	c2.vx = c2vxNew / damping
-	c2.vy = c2vyNew / damping
+	if c1.fluidcollider.static == false then
+		c1.vx = c1vxNew / damping
+		--c1.vy = c1vyNew / damping
+		c1.x = c1x + c1vx
+    	c1.y = c1y + c1vy
+	end
 
-	-- Position values are overwritten for particles by resetting them to their old positions.
-	c1.x = c1x + c1vx
-    c1.y = c1y + c1vy
-    c2.x = c2x + c2vx
-    c2.y = c2y + c2vy
+	if c2.fluidcollider.static == false then
+		c2.vx = c2vxNew / damping
+		c2.vy = c2vyNew / damping
+		c2.x = c2x + c2vx
+   		c2.y = c2y + c2vy
+	end
 end
 
 function fluidsystem.innerBoxResolution(c1, c2, f)
@@ -740,8 +762,8 @@ function fluidsystem.circleResolution(c1, c2, d)
 	local c2vy = c2.vy or 0
 	local c1r = c1.fluidcollider.w or c1.fluidcollider.r or 8
 	local c2r = c2.fluidcollider.w or c2.fluidcollider.r or 8
-	local c1mass = c1.mass or 1
-	local c2mass = c2.mass or 1
+	local c1mass = c1.fluidcollider.mass or 1
+	local c2mass = c2.fluidcollider.mass or 1
 
 	-- Position at which the collision occured
 	local collisionPointX = ((c1x * c2r) + (c2x * c1r)) / (c1r + c2r)
@@ -753,16 +775,19 @@ function fluidsystem.circleResolution(c1, c2, d)
     local a2 = c2vx * nx + c2vy * ny 
     local p = 2 * (a1 - a2) / (c1mass + c2mass) 
 
-    c1.vx = (c1vx - p * nx * c2mass) / damping
-    c1.vy = (c1vy - p * ny * c2mass) / damping
-    c2.vx = (c2vx + p * nx * c1mass) / damping
-    c2.vy = (c2vy + p * ny * c1mass) / damping
+    if c1.fluidcollider.static == false then
+	    c1.vx = (c1vx - p * nx * c2mass) / damping
+	    c1.vy = (c1vy - p * ny * c2mass) / damping
+	    c1.x = c1x + c1vx
+	    c1.y = c1y + c1vy
+	end
 
-	-- Position values are overwritten for particles by resetting them to their old positions.
-    c1.x = c1x + c1vx
-    c1.y = c1y + c1vy
-    c2.x = c2x + c2vx
-    c2.y = c2y + c2vy
+	if c2.fluidcollider.static == false then
+    	c2.vx = (c2vx + p * nx * c1mass) / damping
+    	c2.vy = (c2vy + p * ny * c1mass) / damping
+		c2.x = c2x + c2vx
+   		c2.y = c2y + c2vy
+	end
 
     return collisionPointX, collisionPointY
 end
@@ -813,4 +838,4 @@ function fluidsystem.confineResolution(c, f, x, y, w, h)
 		c.y = sy + offsety + radiusOffset
 		c.vy = -(cvy / 2)
 	end
-end	
+end

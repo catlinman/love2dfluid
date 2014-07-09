@@ -7,10 +7,13 @@ local timestep = 0.018
 
 local fluid = {}
 
+local box = {x = 480, y = 710, mass = 1000}
+fluidsystem.assignBoxCollider(box, 64, 64, 0, true)
+
 function love.load()
 	parameters = {}
 	fluid = fluidsystem.new(parameters)
-
+	fluid:addCollider(box)
 	collectgarbage("setstepmul", 200)
 	collectgarbage("setpause", 105)
 
@@ -45,6 +48,7 @@ function love.draw()
 	love.graphics.print("Toggle the shader by pressing 's' / Toggle Quadtrees by pressing 'q'", 16, 80)
 	love.graphics.print("Total particles: " ..#fluid.particles, 16, 100)
 	fluidsystem:draw()
+	love.graphics.rectangle("fill", box.x, box.y, 64, 64)
 end
 
 function love.mousepressed(x, y, button)

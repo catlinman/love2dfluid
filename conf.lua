@@ -1,7 +1,7 @@
 function love.conf(t)
     t.identity = "lovefluid"
     t.version = "0.9.0"
-    t.console = false
+    t.console = true
     t.window.title = "LOVEFluid Simulation Example"
     t.window.icon = nil
     t.window.width = 1024
