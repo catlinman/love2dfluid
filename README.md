@@ -1,7 +1,9 @@
-#LÖVEFluid#
+# LÖVEFluid #
+
 LÖVEFluid is a real time fluid simulation framework for [LÖVE2D](http://love2d.org/)
 
 ## About ##
+
 The fluid system in this repository was originally created for as a self decided school project by [Catlinman](https://github.com/Catlinman). The main idea is to allow easy fluid particle integration in two-dimensional environments for the Love2d framework while still maintaining a steady performance for normal game related processing. The repository is still work in progress meaning that all of the current developments are subject to change.
 
 ## Implementation ##
@@ -14,4 +16,4 @@ To add the fluid framework to your Love2d project all you have to do is to inser
 
 ## Licence ##
 
-This repository is released under the MIT license. For more information please refer to [LICENSE.md](https://github.com/Catlinman/LOVEFluid/blob/master/LICENSE.md)
+This repository is released under the MIT license. For more information please refer to [LICENSE](https://github.com/Catlinman/LOVEFluid/blob/master/LICENSE)
