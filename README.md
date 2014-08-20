@@ -4,7 +4,7 @@ LÖVEFluid is a real time fluid simulation framework for [LÖVE2D](http://love2d
 
 ## About ##
 
-The fluid system in this repository was originally created for as a self decided school project by [Catlinman](https://github.com/Catlinman). The main idea is to allow easy fluid particle integration in two-dimensional environments for the Love2d framework while still maintaining a steady performance for normal game related processing. The repository is still work in progress meaning that all of the current developments are subject to change.
+The fluid system in this repository was originally created as a self decided school project. The main idea is to allow easy fluid particle integration in two-dimensional environments for the LÖVE2D framework while still maintaining a steady performance for normal game related processing. The repository is still work in progress meaning that all of the current developments are subject to change.
 
 ## Implementation ##
 
