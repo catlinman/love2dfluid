@@ -504,7 +504,7 @@ function fluidsystem.get(id)
 end
 
 -- Destroy an entire fluid system by it's id or name from the systems table
-function fluidsystem.destroy()
+function fluidsystem.destroy(id)
 	if systems[id] then
 		systems[id].removeAllParticles()
 
