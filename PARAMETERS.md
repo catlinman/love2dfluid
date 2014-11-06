@@ -101,27 +101,28 @@ To pass parameters to the fluid system to make use of you will have to create a 
 
 Creating the parameter table is rather simple. It can either be stored in a separate variable or immediately supplied to the `fluidsystem.new(parameters)` function. An example implementation can be seen below.
 
-	
-	local parameters = {
-		radius = 16,
-		color = {125, 125, 255, 255},
-	}
-	
-	local fluid = fluidsystem.new(parameters)
+``` lua
+local parameters = {
+	radius = 16,
+	color = {125, 125, 255, 255},
+}
 
-	-- OR --
+local fluid = fluidsystem.new(parameters)
 
-	local parameters = {}
-	parameters.radius = 16
-	parameters.color = {125, 125, 255, 255}
+-- OR --
 
-	local fluid = fluidsystem.new(parameters)
+local parameters = {}
+parameters.radius = 16
+parameters.color = {125, 125, 255, 255}
 
-	-- OR --
+local fluid = fluidsystem.new(parameters)
 
-	local fluid = fluidsystem.new({
-		radius = 16,
-		color = {125, 125, 255, 255},
-	})
+-- OR --
+
+local fluid = fluidsystem.new({
+	radius = 16,
+	color = {125, 125, 255, 255},
+})
+```
 
 Either way passing parameters and supplying them to the system is as easy as any other task in Lua.
