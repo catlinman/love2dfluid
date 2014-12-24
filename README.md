@@ -14,6 +14,6 @@ To add the fluid framework to your Love2d project all you have to do is to inser
 
 **[Catlinman](http://catlinman.com/)**
 
-## Licence ##
+## License ##
 
 This repository is released under the MIT license. For more information please refer to [LICENSE](https://github.com/Catlinman/LOVEFluid/blob/master/LICENSE)
