@@ -1,8 +1,9 @@
+
 --[[
 
 	LOVEFluid was created by Catlinman and can be forked on GitHub
 
-	-> https://github.com/Catlinman/LOVE2D-FluidSystem
+	-> https://github.com/Catlinman/LOVEFluid
 
 	This file contains the needed code to use and incorporate real time fluid dynamics for your 2D sidescroller. The
 	system itself is still work in progress which means that improvements and additional functionality is still to come.

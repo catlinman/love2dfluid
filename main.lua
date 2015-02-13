@@ -1,4 +1,3 @@
-math.randomseed(os.time())
 
 require("fluidsystem")
 
