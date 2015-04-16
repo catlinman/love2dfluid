@@ -293,6 +293,7 @@ function fluidsystem.new(parameters)
 			end
 
 			self:splitQuad(self.quadtree)
+
 		else
 			for i, particle in pairs(self.particles) do
 				self.quadtree.particles[particle.id] = particle
@@ -354,6 +355,7 @@ function fluidsystem.new(parameters)
 				self.fluideffect:send("color", {self.color[1] / 255, self.color[2] / 255, self.color[3] / 255, self.color[4] / 255})
 				self.fluideffect:send("radius", self.radius)
 				self.fluideffect:send("margin", self.fluidmargin)
+
 			else
 				self.fluideffect = nil
 			end
@@ -423,6 +425,7 @@ function fluidsystem.new(parameters)
 				-- We save the last position this particle was in before it collided to avoid intersection issues.
 				particle.lastx = particle.x - particle.vx
 				particle.lasty = particle.y - particle.vy
+
 			else
 				-- We reset the particle's position to one outside of any collisions.
 				particle.x = particle.lastx 
@@ -437,6 +440,7 @@ function fluidsystem.new(parameters)
 			love.graphics.setColor(255, 255, 255, 255)
 			love.graphics.setShader(self.fluideffect)
 			love.graphics.rectangle('fill', 0,0, love.graphics.getWidth(), love.graphics.getHeight())
+
 		else
 			for i, particle in pairs(self.particles) do
 				love.graphics.setColor(self.color)
@@ -465,6 +469,7 @@ function fluidsystem.new(parameters)
 				for i, affector in pairs(self.affectors) do
 					if affector.radius > ((love.graphics.getWidth() + love.graphics.getHeight()) / 2) then
 						love.graphics.circle("line", affector.x, affector.y, 128)
+
 					else
 						love.graphics.circle("line", affector.x, affector.y, affector.radius)
 					end
@@ -637,9 +642,7 @@ function fluidsystem.circleCollision(c1, c2)
 	return (dist + (c2r^2 - c1r^2)) < (c1r*2)^2
 end
 
-function fluidsystem.pixelCollision(c1, c2)
-
-end
+function fluidsystem.pixelCollision(c1, c2) end -- TODO
 
 -- COLLISION RESOLUTION FUNCTIONS
 function fluidsystem.boxResolution(c1, c2, f, d)
@@ -680,12 +683,15 @@ function fluidsystem.boxResolution(c1, c2, f, d)
 			if c1.fluidcollider.static == false then
 				c1.vx = c1vx * frictionForce
 			end
+
 		elseif c1y - c1vy > c2y + c2h and c1vy < 0 then
 			c1.y = c2.y + c2h
 		end
+
 	elseif c1y - c1vy + c1h > c2y and c1y - c1vy < c2y + c2h then
 		if c1x - c1vx + c1w < c2x and c1vx > 0 then
 			c1.x = c2x - c1w
+
 		elseif c1x - c1vx > c2x + c2w and c1vx < 0 then
 			c1.x = c2x + c2w
 		end
@@ -695,14 +701,14 @@ function fluidsystem.boxResolution(c1, c2, f, d)
 		c1.vx = c1vxNew / damping
 		--c1.vy = c1vyNew / damping
 		c1.x = c1x + c1vx
-    	c1.y = c1y + c1vy
+		c1.y = c1y + c1vy
 	end
 
 	if c2.fluidcollider.static == false then
 		c2.vx = c2vxNew / damping
 		c2.vy = c2vyNew / damping
 		c2.x = c2x + c2vx
-   		c2.y = c2y + c2vy
+		c2.y = c2y + c2vy
 	end
 end
 
@@ -771,31 +777,29 @@ function fluidsystem.circleResolution(c1, c2, d)
 	local collisionPointY = ((c1y * c2r) + (c2y * c1r)) / (c1r + c2r)
 
 	local nx = (c1x - c2x) / (c1r + c2r) 
-    local ny = (c1y - c2y) / (c1r + c2r) 
-    local a1 = c1vx * nx + c1vy * ny 
-    local a2 = c2vx * nx + c2vy * ny 
-    local p = 2 * (a1 - a2) / (c1mass + c2mass) 
+	local ny = (c1y - c2y) / (c1r + c2r) 
+	local a1 = c1vx * nx + c1vy * ny 
+	local a2 = c2vx * nx + c2vy * ny 
+	local p = 2 * (a1 - a2) / (c1mass + c2mass) 
 
-    if c1.fluidcollider.static == false then
-	    c1.vx = (c1vx - p * nx * c2mass) / damping
-	    c1.vy = (c1vy - p * ny * c2mass) / damping
-	    c1.x = c1x + c1vx
-	    c1.y = c1y + c1vy
+	if c1.fluidcollider.static == false then
+		c1.vx = (c1vx - p * nx * c2mass) / damping
+		c1.vy = (c1vy - p * ny * c2mass) / damping
+		c1.x = c1x + c1vx
+		c1.y = c1y + c1vy
 	end
 
 	if c2.fluidcollider.static == false then
-    	c2.vx = (c2vx + p * nx * c1mass) / damping
-    	c2.vy = (c2vy + p * ny * c1mass) / damping
+		c2.vx = (c2vx + p * nx * c1mass) / damping
+		c2.vy = (c2vy + p * ny * c1mass) / damping
 		c2.x = c2x + c2vx
-   		c2.y = c2y + c2vy
+		c2.y = c2y + c2vy
 	end
 
-    return collisionPointX, collisionPointY
+	return collisionPointX, collisionPointY
 end
 
-function fluidsystem.pixelResolution(c1, c2)
-
-end
+function fluidsystem.pixelResolution(c1, c2) end -- TODO
 
 -- Keeps a collider inside a specified area
 function fluidsystem.confineResolution(c, f, x, y, w, h)

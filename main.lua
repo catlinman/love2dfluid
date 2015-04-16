@@ -58,6 +58,7 @@ end
 function love.mousepressed(x, y, button)
 	if button == "l" then
 		fluid:applyImpulse(x, y, 250)
+
 	elseif button == "r" then
 		fluid:addParticle(x, y, math.random(-1000,1000) / 100, math.random(-1000,1000) / 100)
 	end
@@ -75,6 +76,7 @@ function love.keypressed(keycode)
 	if keycode == "s" then
 		if fluid.drawshader == true then 
 			fluid.drawshader = false
+
 		else
 			fluid.drawshader = true
 			if #fluid.particles > 0 then
@@ -84,8 +86,9 @@ function love.keypressed(keycode)
 	end
 
 	if keycode == "q" then
-		if fluid.drawquads == true then 
+		if fluid.drawquads == true then
 			fluid.drawquads = false
+
 		else
 			fluid.drawquads = true
 		end
