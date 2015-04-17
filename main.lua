@@ -76,7 +76,6 @@ function love.keypressed(keycode)
 	if keycode == "s" then
 		if fluid.drawshader == true then 
 			fluid.drawshader = false
-
 		else
 			fluid.drawshader = true
 			if #fluid.particles > 0 then
@@ -88,7 +87,6 @@ function love.keypressed(keycode)
 	if keycode == "q" then
 		if fluid.drawquads == true then
 			fluid.drawquads = false
-
 		else
 			fluid.drawquads = true
 		end

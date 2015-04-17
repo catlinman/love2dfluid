@@ -293,7 +293,6 @@ function fluidsystem.new(parameters)
 			end
 
 			self:splitQuad(self.quadtree)
-
 		else
 			for i, particle in pairs(self.particles) do
 				self.quadtree.particles[particle.id] = particle
@@ -355,7 +354,6 @@ function fluidsystem.new(parameters)
 				self.fluideffect:send("color", {self.color[1] / 255, self.color[2] / 255, self.color[3] / 255, self.color[4] / 255})
 				self.fluideffect:send("radius", self.radius)
 				self.fluideffect:send("margin", self.fluidmargin)
-
 			else
 				self.fluideffect = nil
 			end
@@ -425,7 +423,6 @@ function fluidsystem.new(parameters)
 				-- We save the last position this particle was in before it collided to avoid intersection issues.
 				particle.lastx = particle.x - particle.vx
 				particle.lasty = particle.y - particle.vy
-
 			else
 				-- We reset the particle's position to one outside of any collisions.
 				particle.x = particle.lastx 
@@ -440,7 +437,6 @@ function fluidsystem.new(parameters)
 			love.graphics.setColor(255, 255, 255, 255)
 			love.graphics.setShader(self.fluideffect)
 			love.graphics.rectangle('fill', 0,0, love.graphics.getWidth(), love.graphics.getHeight())
-
 		else
 			for i, particle in pairs(self.particles) do
 				love.graphics.setColor(self.color)
@@ -469,7 +465,6 @@ function fluidsystem.new(parameters)
 				for i, affector in pairs(self.affectors) do
 					if affector.radius > ((love.graphics.getWidth() + love.graphics.getHeight()) / 2) then
 						love.graphics.circle("line", affector.x, affector.y, 128)
-
 					else
 						love.graphics.circle("line", affector.x, affector.y, affector.radius)
 					end
