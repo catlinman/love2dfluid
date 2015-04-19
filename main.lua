@@ -1,5 +1,7 @@
 
-require("fluidsystem")
+-- Example main file to show the fluidsystem functionality.
+
+local fluidsystem = require("lovefluid") -- Require the fluidsystem.
 
 local strayTime = 0
 local timestep = 0.018

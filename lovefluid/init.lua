@@ -30,7 +30,7 @@
 local systems = {} -- Table containing the fluid systems
 local id = 1 -- Fluid system reference identification
 
-fluidsystem = {} -- Global variable containing the functions used to create and modify the fluid system
+local fluidsystem = {} -- Variable containing the functions used to create and modify the fluid system
 
 -- Calling this function instantiates a new fluid system. The Arugment is a table containing all the information needed for the particlesystem.
 function fluidsystem.new(parameters)
@@ -839,3 +839,5 @@ function fluidsystem.confineResolution(c, f, x, y, w, h)
 		c.vy = -(cvy / 2)
 	end
 end
+
+return fluidsystem
