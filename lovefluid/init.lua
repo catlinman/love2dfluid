@@ -3,7 +3,7 @@
 
 	LOVEFluid was created by Catlinman and can be forked on GitHub
 
-	-> https://github.com/Catlinman/LOVEFluid
+	-> https://github.com/catlinman/lovefluid
 
 	This file contains the needed code to use and incorporate real time fluid dynamics for your 2D sidescroller. The
 	system itself is still work in progress which means that improvements and additional functionality is still to come.
@@ -11,7 +11,7 @@
 	Feel free to modify the file to your liking as long as I am credited for the original work. For more information please
 	refer to the following link:
 
-	-> https://github.com/Catlinman/LOVE2D-FluidSystem/blob/master/LICENSE.md
+	-> https://github.com/catlinman/lovefluid/blob/master/LICENSE
 	
 	I have attempted to comment most of the code to allow those not familiar with LOVE to jump faster into modifying the code.
 	To remove all comments simply use a program like Sublime Text 2 and replace everything with whitespace using the following regex line:
